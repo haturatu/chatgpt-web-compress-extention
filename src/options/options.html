@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#101010" />
+    <meta name="color-scheme" content="dark" />
+    <title>ChatGPT Long Thread Optimizer settings</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main class="page-shell">
+      <header class="page-header">
+        <p class="eyebrow">CHATGPT / EXTENSION SETTINGS</p>
+        <h1>Thread optimizer</h1>
+        <p class="lede">Keep long conversations responsive while leaving React-owned DOM nodes in place.</p>
+      </header>
+
+      <form id="settings-form">
+        <section class="panel" aria-labelledby="behavior-heading">
+          <div class="panel-heading"><div><p class="eyebrow">BEHAVIOR</p><h2 id="behavior-heading">Choose how much rendering work to skip</h2></div></div>
+          <label class="switch-row" for="enabled">
+            <span><span class="label">Enabled</span><span class="hint">Apply optimization on supported ChatGPT conversations</span></span>
+            <input id="enabled" name="enabled" type="checkbox" role="switch" />
+          </label>
+          <label class="field" for="mode"><span class="label">Mode</span><span class="hint">Safe uses CSS containment only. Other modes use content-visibility hidden for older turns.</span>
+            <select id="mode" name="mode"><option value="safe">Safe · CSS containment</option><option value="balanced">Balanced · window mode</option><option value="aggressive">Aggressive · tighter window</option></select>
+          </label>
+          <div class="two-col">
+            <label class="field" for="active-window"><span class="label">Active window</span><span class="hint">Turns kept ready around the viewport</span><input id="active-window" name="activeWindow" type="number" min="20" max="240" step="5" required /></label>
+            <label class="field" for="batch-size"><span class="label">Load batch</span><span class="hint">Turns restored on upward scroll</span><input id="batch-size" name="batchSize" type="number" min="5" max="100" step="5" required /></label>
+          </div>
+          <div class="two-col">
+            <label class="field" for="pinned-tail"><span class="label">Pinned latest turns</span><span class="hint">Always keep the newest turns active</span><input id="pinned-tail" name="pinnedTail" type="number" min="5" max="50" step="1" required /></label>
+            <label class="field" for="preload-margin"><span class="label">Preload margin</span><span class="hint">Pixels before a dormant boundary loads</span><input id="preload-margin" name="preloadMargin" type="number" min="200" max="2000" step="100" required /></label>
+          </div>
+          <label class="check-row" for="auto-load"><span><span class="label">Auto load older turns</span><span class="hint">Use one guarded batch per upward scroll</span></span><input id="auto-load" name="autoLoad" type="checkbox" /></label>
+          <label class="check-row" for="show-stats"><span><span class="label">Show page stats</span><span class="hint">Show an unobtrusive active/total status on ChatGPT</span></span><input id="show-stats" name="showStats" type="checkbox" /></label>
+        </section>
+
+        <section class="panel note-panel" aria-labelledby="compatibility-heading">
+          <p class="eyebrow">COMPATIBILITY</p>
+          <h2 id="compatibility-heading">Safe by default</h2>
+          <p>The extension never calls <code>remove()</code>, <code>display: none</code>, or replaces conversation turns. If the page structure is unfamiliar, it stays inactive until a supported conversation is detected.</p>
+        </section>
+
+        <div class="actions"><button type="submit" class="primary-button">Save settings</button><span id="message" class="message" role="status" aria-live="polite"></span></div>
+      </form>
+    </main>
+    <script src="options.js"></script>
+  </body>
+</html>

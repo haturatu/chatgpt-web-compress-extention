@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>Thread Optimizer</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="header">
+        <div>
+          <p class="eyebrow">CHATGPT</p>
+          <h1>Thread optimizer</h1>
+        </div>
+        <span id="status-dot" class="status-dot" aria-label="Status"></span>
+      </header>
+
+      <form id="settings-form" novalidate>
+        <label class="switch-row" for="enabled">
+          <span>
+            <span class="label">Enabled</span>
+            <span class="hint">Keep long threads responsive</span>
+          </span>
+          <input id="enabled" name="enabled" type="checkbox" role="switch" />
+        </label>
+
+        <label class="field" for="mode">
+          <span class="label">Mode</span>
+          <select id="mode" name="mode">
+            <option value="safe">Safe · CSS containment</option>
+            <option value="balanced">Balanced · window mode</option>
+            <option value="aggressive">Aggressive · tighter window</option>
+          </select>
+        </label>
+
+        <div class="range-field">
+          <div class="range-label"><label for="active-window">Active window</label><output id="active-window-value" for="active-window"></output></div>
+          <input id="active-window" name="activeWindow" type="range" min="20" max="240" step="5" />
+          <p class="hint">Turns kept ready around your viewport</p>
+        </div>
+
+        <div class="range-field">
+          <div class="range-label"><label for="batch-size">Load batch</label><output id="batch-size-value" for="batch-size"></output></div>
+          <input id="batch-size" name="batchSize" type="range" min="5" max="100" step="5" />
+          <p class="hint">Turns restored when scrolling upward</p>
+        </div>
+
+        <label class="check-row" for="auto-load">
+          <span><span class="label">Auto load</span><span class="hint">Preload before you reach older turns</span></span>
+          <input id="auto-load" name="autoLoad" type="checkbox" />
+        </label>
+
+        <label class="check-row" for="show-stats">
+          <span><span class="label">Show stats</span><span class="hint">Display a compact page status</span></span>
+          <input id="show-stats" name="showStats" type="checkbox" />
+        </label>
+      </form>
+
+      <section class="stats-card" aria-labelledby="stats-heading">
+        <div class="section-heading"><h2 id="stats-heading">Current thread</h2><span id="thread-status">Not detected</span></div>
+        <dl class="stats-grid">
+          <div><dt>Turns</dt><dd id="turns">—</dd></div>
+          <div><dt>Active</dt><dd id="active">—</dd></div>
+          <div><dt>Dormant</dt><dd id="dormant">—</dd></div>
+          <div><dt>Long tasks</dt><dd id="long-tasks">—</dd></div>
+        </dl>
+      </section>
+
+      <button id="tab-toggle" class="secondary-button" type="button">Disable for this tab</button>
+      <p id="message" class="message" role="status" aria-live="polite"></p>
+      <button class="settings-link" type="button" id="open-options">Open full settings <span aria-hidden="true">↗</span></button>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>
