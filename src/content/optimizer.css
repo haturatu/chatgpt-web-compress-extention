@@ -1,0 +1,23 @@
+/*
+ * The extension only opts in elements marked by its content script. This keeps
+ * unsupported ChatGPT layouts completely untouched (fail-open).
+ */
+[data-cgpt-optimizer-turn="true"] {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 420px;
+}
+
+[data-cgpt-optimizer-state="dormant"] {
+  content-visibility: hidden;
+  contain-intrinsic-size: auto 420px;
+}
+
+[data-cgpt-optimizer-state="active"] {
+  content-visibility: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-cgpt-optimizer-turn="true"] {
+    scroll-behavior: auto;
+  }
+}
