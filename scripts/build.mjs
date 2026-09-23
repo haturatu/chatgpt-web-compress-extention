@@ -18,9 +18,13 @@ const common = {
 };
 
 const entries = [
+  ['src/background/index.ts', 'background.js'],
+  ['src/content/bridge.ts', 'bridge.js'],
+  ['src/content/main-world-bootstrap.ts', 'main-world-bootstrap.js'],
   ['src/content/index.ts', 'content.js'],
   ['src/popup/index.ts', 'popup.js'],
-  ['src/options/index.ts', 'options.js']
+  ['src/options/index.ts', 'options.js'],
+  ['src/reader/index.ts', 'reader.js']
 ];
 
 const buildAll = async () => {
@@ -35,6 +39,8 @@ const buildAll = async () => {
   await cp(resolve(root, 'src/popup/popup.css'), resolve(outDir, 'popup.css'));
   await cp(resolve(root, 'src/options/options.html'), resolve(outDir, 'options.html'));
   await cp(resolve(root, 'src/options/options.css'), resolve(outDir, 'options.css'));
+  await cp(resolve(root, 'src/reader/reader.html'), resolve(outDir, 'reader.html'));
+  await cp(resolve(root, 'src/reader/reader.css'), resolve(outDir, 'reader.css'));
 
   const manifest = JSON.parse(await readFile(resolve(root, 'manifest.json'), 'utf8'));
   await writeFile(resolve(outDir, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
@@ -52,6 +58,8 @@ if (process.argv.includes('--watch')) {
   await cp(resolve(root, 'src/popup/popup.css'), resolve(outDir, 'popup.css'));
   await cp(resolve(root, 'src/options/options.html'), resolve(outDir, 'options.html'));
   await cp(resolve(root, 'src/options/options.css'), resolve(outDir, 'options.css'));
+  await cp(resolve(root, 'src/reader/reader.html'), resolve(outDir, 'reader.html'));
+  await cp(resolve(root, 'src/reader/reader.css'), resolve(outDir, 'reader.css'));
 } else {
   await buildAll();
 }

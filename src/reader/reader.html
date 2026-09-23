@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#101010" />
+    <meta name="color-scheme" content="dark" />
+    <title>Lite Reader · ChatGPT archive</title>
+    <link rel="stylesheet" href="reader.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#conversation-scroll">Skip to conversation</a>
+    <header class="reader-header">
+      <div class="title-group">
+        <p class="eyebrow">LOCAL CHATGPT ARCHIVE</p>
+        <h1 id="archive-title">Lite Reader</h1>
+        <p id="archive-detail" class="muted">Loading archive…</p>
+      </div>
+      <nav class="actions" aria-label="Archive actions">
+        <button id="resume" class="secondary-button" type="button">Return to ChatGPT</button>
+        <button id="delete" class="danger-button" type="button">Delete archive…</button>
+      </nav>
+    </header>
+    <main id="archive-main">
+      <form id="search-form" class="search-row">
+        <label for="archive-search">Find in archive</label>
+        <input id="archive-search" name="q" type="search" autocomplete="off" placeholder="Search messages…" />
+        <button class="secondary-button" type="submit">Find</button>
+      </form>
+      <p id="reader-status" class="status" role="status" aria-live="polite">Loading archive…</p>
+      <section id="conversation-scroll" class="conversation-scroll" tabindex="0" aria-label="Archived conversation">
+        <div id="top-spacer" aria-hidden="true"></div>
+        <div id="turn-window"></div>
+        <div id="bottom-spacer" aria-hidden="true"></div>
+      </section>
+    </main>
+    <dialog id="delete-confirm" aria-labelledby="delete-title">
+      <form method="dialog">
+        <h2 id="delete-title">Delete this local archive?</h2>
+        <p>The compressed copy will be removed. Your ChatGPT conversation remains available in its original tab.</p>
+        <div class="dialog-actions">
+          <button class="secondary-button" value="cancel">Cancel</button>
+          <button id="confirm-delete" class="danger-button" value="delete">Delete archive</button>
+        </div>
+      </form>
+    </dialog>
+    <script src="reader.js"></script>
+  </body>
+</html>

@@ -14,6 +14,7 @@ h2 { margin: 0; font-size: 16px; letter-spacing: -.02em; }
 .hint { display: block; margin-top: 5px; color: #8d8d8d; font-size: 12px; line-height: 1.45; }
 input[type="checkbox"] { width: 20px; height: 20px; flex: 0 0 auto; accent-color: #ededed; }
 .field { display: block; margin-top: 22px; }
+.field-action { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 6px; }
 select, input[type="number"] { width: 100%; margin-top: 9px; border: 1px solid #3a3a3a; border-radius: 8px; padding: 11px 12px; background: #1b1b1b; color: #ededed; font: inherit; font-size: 13px; }
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
 .note-panel p:last-child { margin: 10px 0 0; color: #a0a0a0; font-size: 13px; line-height: 1.6; }
@@ -22,6 +23,9 @@ code { color: #e1e1e1; font: 12px ui-monospace, SFMono-Regular, Menlo, monospace
 .primary-button { border: 1px solid #f1f1f1; border-radius: 8px; padding: 11px 16px; background: #f1f1f1; color: #121212; font: inherit; font-size: 13px; font-weight: 650; cursor: pointer; }
 .primary-button:hover { background: #fff; }
 .message { color: #9f9f9f; font-size: 12px; }
+.reload-note { margin: 16px 0 0; }
+.text-button { border: 0; padding: 3px 0; background: transparent; color: #c0c0c0; font: inherit; font-size: 12px; text-decoration: underline; cursor: pointer; }
+.text-button:hover { color: #fff; }
 button, select, input { touch-action: manipulation; }
 :focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
 @media (max-width: 600px) { .page-shell { width: min(100% - 28px, 760px); padding-top: 36px; } .panel { padding: 18px; } .two-col { grid-template-columns: 1fr; gap: 0; } }

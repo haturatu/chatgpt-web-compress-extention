@@ -4,13 +4,30 @@
   "version": "0.1.0",
   "description": "Keep long ChatGPT conversations responsive without removing React-owned DOM nodes.",
   "permissions": [
-    "storage"
+    "storage",
+    "tabs",
+    "scripting",
+    "unlimitedStorage"
   ],
   "host_permissions": [
     "https://chatgpt.com/*",
     "https://chat.openai.com/*"
   ],
+  "background": {
+    "service_worker": "background.js"
+  },
   "content_scripts": [
+    {
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*"
+      ],
+      "js": [
+        "bridge.js"
+      ],
+      "run_at": "document_start",
+      "world": "ISOLATED"
+    },
     {
       "matches": [
         "https://chatgpt.com/*",

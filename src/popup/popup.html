@@ -32,7 +32,7 @@
             <option value="safe">Safe · CSS containment</option>
             <option value="balanced">Balanced · window mode</option>
             <option value="aggressive">Aggressive · tighter window</option>
-            <option value="memory-saver">Memory Saver · experimental</option>
+            <option value="hibernate">Hibernate · experimental</option>
           </select>
           <span id="mode-hint" class="hint"></span>
         </label>
@@ -70,10 +70,27 @@
         </dl>
       </section>
 
+      <section class="archive-card" aria-labelledby="archive-heading">
+        <div class="section-heading"><h2 id="archive-heading">Lite Reader</h2><span>Local archive</span></div>
+        <p class="hint">Save currently rendered turns as compressed text, then discard this tab. ChatGPT may virtualize older turns; check the Reader count.</p>
+        <button id="archive-current" class="primary-button" type="button">Archive visible turns & free memory…</button>
+        <div id="archives" class="archives" aria-live="polite"></div>
+      </section>
+
       <button id="tab-toggle" class="secondary-button" type="button">Disable for this tab</button>
       <p id="message" class="message" role="status" aria-live="polite"></p>
       <button class="settings-link" type="button" id="open-options">Open full settings <span aria-hidden="true">↗</span></button>
     </main>
+    <dialog id="archive-confirm" class="confirm-dialog" aria-labelledby="archive-confirm-title">
+      <form method="dialog">
+        <h2 id="archive-confirm-title">Save visible turns & discard this tab?</h2>
+        <p>Only turns currently rendered by ChatGPT are captured. Older turns may be virtualized, so verify the message count in Lite Reader before relying on this copy. The original tab reloads when you return. A draft or active response prevents archiving.</p>
+        <div class="dialog-actions">
+          <button class="secondary-button" value="cancel">Cancel</button>
+          <button id="confirm-archive" class="primary-button" value="confirm">Save visible turns & discard</button>
+        </div>
+      </form>
+    </dialog>
     <script src="popup.js"></script>
   </body>
 </html>

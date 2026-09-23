@@ -24,7 +24,7 @@
             <input id="enabled" name="enabled" type="checkbox" role="switch" />
           </label>
           <label class="field" for="mode"><span class="label">Mode</span><span id="mode-hint" class="hint"></span>
-            <select id="mode" name="mode"><option value="safe">Safe · CSS-native</option><option value="balanced">Balanced · window mode</option><option value="aggressive">Aggressive · tighter window</option><option value="memory-saver">Memory Saver · experimental</option></select>
+            <select id="mode" name="mode"><option value="safe">Safe · CSS-native</option><option value="balanced">Balanced · window mode</option><option value="aggressive">Aggressive · tighter window</option><option value="hibernate">Hibernate · experimental</option></select>
           </label>
           <div class="two-col">
             <label class="field" for="active-window"><span class="label">Active window</span><span class="hint">Turns kept ready around the viewport</span><input id="active-window" name="activeWindow" type="number" min="20" max="240" step="5" required /></label>
@@ -38,10 +38,24 @@
           <label class="check-row" for="show-stats"><span><span class="label">Show page stats</span><span class="hint">Show an unobtrusive active/total status on ChatGPT</span></span><input id="show-stats" name="showStats" type="checkbox" /></label>
         </section>
 
+        <section class="panel" aria-labelledby="memory-heading">
+          <div class="panel-heading"><p class="eyebrow">EXPERIMENTAL</p><h2 id="memory-heading">Archive & hard memory saver</h2></div>
+          <label class="check-row" for="network-discovery"><span><span class="label">Network discovery</span><span class="hint">Record same-origin fetch paths, response types, and sizes. Request and response bodies are not saved.</span></span><input id="network-discovery" name="networkDiscoveryEnabled" type="checkbox" /></label>
+          <label class="field" for="hard-memory-path"><span class="label">Conversation response</span><span class="hint">Select the JSON response seen in Network discovery. The path is stored without query strings or conversation IDs.</span>
+            <select id="hard-memory-path" name="hardMemoryPayloadPath"><option value="">No response selected</option></select>
+          </label>
+          <div class="two-col">
+            <label class="field" for="hard-memory-turns"><span class="label">Recent turns kept in ChatGPT</span><span class="hint">Older messages go to the compressed Lite Reader archive.</span><input id="hard-memory-turns" name="hardMemoryRetainedTurns" type="number" min="20" max="240" step="10" required /></label>
+            <div class="field field-action"><span class="label">Discovery data</span><span id="discovery-count" class="hint">No responses recorded</span><button id="clear-discovery" class="text-button" type="button">Clear discovery data</button></div>
+          </div>
+          <label class="check-row" for="hard-memory"><span><span class="label">Hard Memory Saver</span><span class="hint">After a full local archive is saved, keep only the latest messages in the detected response. Unknown formats pass through unchanged.</span></span><input id="hard-memory" name="hardMemoryEnabled" type="checkbox" /></label>
+          <p class="hint reload-note">Save settings, then reload the ChatGPT tab to install or remove the document-start hook. This experiment may affect branch history and conversation controls.</p>
+        </section>
+
         <section class="panel note-panel" aria-labelledby="compatibility-heading">
           <p class="eyebrow">COMPATIBILITY</p>
           <h2 id="compatibility-heading">Safe by default</h2>
-          <p>Safe, Balanced, and Aggressive keep conversation nodes attached and do not use <code>display: none</code>. Memory Saver is an opt-in experiment that hides off-window turn children and preserves a measured height. It can affect page search, accessibility, and ChatGPT controls; switch back to another mode if a turn behaves incorrectly. If the page structure is unfamiliar, optimization stays inactive.</p>
+          <p>Safe, Balanced, and Aggressive keep conversation nodes attached and do not use <code>display: none</code>. Hibernate hides off-window turn children, preserves measured height, and pauses restorable remote media. Hard Memory Saver is a separate opt-in experiment that archives a recognized response before trimming it. Unknown formats pass through untouched. If a turn or ChatGPT control behaves incorrectly, disable the experiment and reload the page.</p>
         </section>
 
         <div class="actions"><button type="submit" class="primary-button">Save settings</button><span id="message" class="message" role="status" aria-live="polite"></span></div>
