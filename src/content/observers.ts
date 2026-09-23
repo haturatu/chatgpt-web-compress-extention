@@ -1,6 +1,7 @@
 import { BatchLoadGate } from './scheduler';
 import { HeightMeasurements } from './measurements';
 import { TurnRegistry } from './registry';
+import { findScrollableAncestor } from './scrolling';
 import type { TurnInfo } from '../shared/types';
 
 export interface ConversationObserverCallbacks {
@@ -19,6 +20,7 @@ export class ConversationObservers {
   private readonly visibleElements = new Set<HTMLElement>();
   private readonly observedElements = new Set<HTMLElement>();
   private boundary: HTMLElement | null = null;
+  private scrollContainer: HTMLElement | null = null;
   private parentObserver: MutationObserver | null = null;
   private bodyObserver: MutationObserver | null = null;
   private callbacks: ConversationObserverCallbacks | null = null;
@@ -64,7 +66,13 @@ export class ConversationObservers {
       this.bodyObserver.observe(document.body, { childList: true });
     }
 
-    window.addEventListener('scroll', this.handleScroll, { passive: true });
+    const firstTurn = this.registry.ordered()[0]?.element ?? root;
+    this.scrollContainer = findScrollableAncestor(firstTurn);
+    if (this.scrollContainer) {
+      this.scrollContainer.addEventListener('scroll', this.handleScroll, { passive: true });
+    } else {
+      window.addEventListener('scroll', this.handleScroll, { passive: true });
+    }
     window.addEventListener('popstate', this.handleNavigation);
     window.addEventListener('hashchange', this.handleNavigation);
   }
@@ -102,7 +110,12 @@ export class ConversationObservers {
     this.measurements.destroy();
     this.parentObserver?.disconnect();
     this.bodyObserver?.disconnect();
-    window.removeEventListener('scroll', this.handleScroll);
+    if (this.scrollContainer) {
+      this.scrollContainer.removeEventListener('scroll', this.handleScroll);
+      this.scrollContainer = null;
+    } else {
+      window.removeEventListener('scroll', this.handleScroll);
+    }
     window.removeEventListener('popstate', this.handleNavigation);
     window.removeEventListener('hashchange', this.handleNavigation);
     this.visibleElements.clear();
