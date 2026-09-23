@@ -19,7 +19,7 @@ export const CONFIG_LIMITS = {
 } as const;
 
 const isMode = (value: unknown): value is OptimizationMode =>
-  value === 'safe' || value === 'balanced' || value === 'aggressive';
+  value === 'safe' || value === 'balanced' || value === 'aggressive' || value === 'memory-saver';
 
 const numberInRange = (value: unknown, min: number, max: number, fallback: number): number => {
   if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;

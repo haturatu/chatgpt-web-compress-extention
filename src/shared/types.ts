@@ -1,4 +1,4 @@
-export type OptimizationMode = 'safe' | 'balanced' | 'aggressive';
+export type OptimizationMode = 'safe' | 'balanced' | 'aggressive' | 'memory-saver';
 
 export interface OptimizerConfig {
   enabled: boolean;
@@ -9,11 +9,6 @@ export interface OptimizerConfig {
   preloadMargin: number;
   autoLoad: boolean;
   showStats: boolean;
-}
-
-export interface TurnInfo {
-  element: HTMLElement;
-  index: number;
 }
 
 export interface ViewportState {

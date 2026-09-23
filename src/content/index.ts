@@ -1,13 +1,50 @@
 import { loadConfig, normalizeConfig } from '../shared/config';
 import { logger } from '../shared/logger';
 import type { ContentRequest, ContentResponse, OptimizerConfig, OptimizerStats } from '../shared/types';
-import { detectTurns, extractTurnsFromNode, findConversationRoot, isValidConversationRoot } from './detector';
+import { detectTurnsYielding, extractTurnsFromNode, findConversationRoot } from './detector';
 import { ConversationObservers } from './observers';
 import { Optimizer } from './optimizer';
 import { TurnRegistry } from './registry';
-import { Scheduler } from './scheduler';
+import { Scheduler, yieldToBrowser } from './scheduler';
 import { PerformanceMetrics } from './metrics';
 import { StatusSurface } from './ui';
+import { LONG_MARKDOWN_ATTRIBUTE } from './selectors';
+
+const MARKDOWN_SELECTOR = '[class~="markdown"]';
+const LONG_MARKDOWN_CHILD_COUNT = 24;
+
+function markLongMarkdown(root: HTMLElement): void {
+  for (const markdown of root.querySelectorAll<HTMLElement>(MARKDOWN_SELECTOR)) {
+    if (markdown.children.length >= LONG_MARKDOWN_CHILD_COUNT) {
+      markdown.setAttribute(LONG_MARKDOWN_ATTRIBUTE, '');
+    }
+  }
+}
+
+function markLongMarkdownFromMutations(root: HTMLElement, records: readonly MutationRecord[]): void {
+  const candidates = new Set<HTMLElement>();
+  for (const record of records) {
+    const target = record.target instanceof HTMLElement
+      ? record.target
+      : record.target.parentElement;
+    const ancestor = target?.closest<HTMLElement>(MARKDOWN_SELECTOR);
+    if (ancestor) candidates.add(ancestor);
+
+    for (const node of record.addedNodes) {
+      if (!(node instanceof HTMLElement)) continue;
+      const parentMarkdown = node.parentElement?.closest<HTMLElement>(MARKDOWN_SELECTOR);
+      if (parentMarkdown) candidates.add(parentMarkdown);
+      if (node.matches(MARKDOWN_SELECTOR)) candidates.add(node);
+      for (const markdown of node.querySelectorAll<HTMLElement>(MARKDOWN_SELECTOR)) candidates.add(markdown);
+    }
+  }
+
+  for (const markdown of candidates) {
+    if (root.contains(markdown) && markdown.children.length >= LONG_MARKDOWN_CHILD_COUNT) {
+      markdown.setAttribute(LONG_MARKDOWN_ATTRIBUTE, '');
+    }
+  }
+}
 
 class ContentController {
   private config: OptimizerConfig = normalizeConfig(undefined);
@@ -23,6 +60,7 @@ class ContentController {
   private tabDisabled = false;
   private lastUrl = location.href;
   private disabledReason: string | undefined;
+  private mountGeneration = 0;
 
   async start(): Promise<void> {
     this.config = await loadConfig();
@@ -65,7 +103,7 @@ class ContentController {
 
     if (this.currentRoot?.isConnected) return;
     const root = findConversationRoot(document);
-    if (!root || !isValidConversationRoot(root)) {
+    if (!root) {
       this.disabledReason = 'unsupported-dom';
       return;
     }
@@ -76,53 +114,91 @@ class ContentController {
 
   private mount(root: HTMLElement): void {
     this.stopDiscoveryObserver();
+    const generation = ++this.mountGeneration;
     this.currentRoot = root;
     this.registry.clear();
-    this.registry.addMany(detectTurns(root));
-    this.optimizer = new Optimizer(this.registry, this.effectiveConfig());
-    this.observers = new ConversationObservers(this.registry, this.config.preloadMargin);
+    this.optimizer = new Optimizer(this.registry, this.effectiveConfig(), root);
+    this.observers = new ConversationObservers(this.registry, this.config.preloadMargin, this.config.mode);
     this.observers.mount(root, {
       onMutations: (records) => this.handleMutations(records),
       onViewport: (firstVisible, lastVisible) => this.handleViewport(firstVisible, lastVisible),
+      onResize: (entries) => this.handleResizes(entries),
       onExpandBefore: () => this.handleExpandBefore(),
       onRootChanged: () => this.handleRootChanged()
     });
+
+    if (this.config.enabled && !this.tabDisabled) markLongMarkdown(root);
+    if (this.config.mode === 'safe') {
+      this.reconcile();
+      logger.info('conversation optimizer mounted', { mode: 'safe-css-native' });
+      return;
+    }
+    void this.initializeTurns(root, generation);
+  }
+
+  private async initializeTurns(root: HTMLElement, generation: number): Promise<void> {
+    const shouldContinue = (): boolean =>
+      generation === this.mountGeneration && root === this.currentRoot && root.isConnected;
+    const elements = await detectTurnsYielding(root, yieldToBrowser, 64, shouldContinue);
+    if (generation !== this.mountGeneration || root !== this.currentRoot || !root.isConnected) return;
+    await this.registry.addManyYielding(elements, yieldToBrowser, 64, () =>
+      generation === this.mountGeneration && root === this.currentRoot && root.isConnected
+    );
+    if (generation !== this.mountGeneration || root !== this.currentRoot || !root.isConnected) return;
+    this.observers?.refreshViewport(true);
     this.reconcile();
-    logger.info('conversation optimizer mounted', { turns: this.registry.count() });
+    logger.info('conversation optimizer mounted', { turns: this.registry.count(), mode: this.config.mode });
   }
 
   private handleMutations(records: MutationRecord[]): void {
+    const root = this.currentRoot;
+    if (!root) return;
+    if (this.config.enabled && !this.tabDisabled) markLongMarkdownFromMutations(root, records);
+    if (this.config.mode === 'safe') {
+      if (this.config.showStats) this.scheduler.idle(() => this.updateStatus());
+      return;
+    }
+
     let registryChanged = false;
+    let registryRemoved = false;
     for (const record of records) {
       for (const node of Array.from(record.addedNodes)) {
         const elements = extractTurnsFromNode(node).filter((element) => this.currentRoot?.contains(element));
-        if (elements.length > 0) {
-          this.registry.addMany(elements);
-          registryChanged = true;
-        }
+        if (elements.length > 0 && this.registry.addMany(elements) > 0) registryChanged = true;
       }
       for (const node of Array.from(record.removedNodes)) {
-        if (node instanceof HTMLElement) {
-          this.registry.remove(node);
-          for (const info of this.registry.ordered()) {
-            if (node.contains(info.element)) this.registry.remove(info.element);
-          }
+        if (!(node instanceof HTMLElement)) continue;
+        const mayContainTurn = this.registry.has(node)
+          || Boolean(node.querySelector('[data-testid^="conversation-turn"], article, [data-message-author-role]'));
+        if (mayContainTurn && this.registry.removeWithin(node) > 0) {
           registryChanged = true;
+          registryRemoved = true;
         }
       }
     }
 
     if (!registryChanged) return;
-    this.scheduler.idle(() => {
-      this.registry.cleanupDisconnected();
-    });
-    this.scheduler.frame(() => this.reconcile());
+    this.observers?.refreshViewport(true);
+    if (registryRemoved) {
+      this.scheduler.idle(() => {
+        this.registry.cleanupDisconnected();
+        this.scheduler.task(() => this.reconcile(), 'user-visible');
+      });
+    }
+    this.scheduler.task(() => this.reconcile(), 'user-visible');
   }
 
   private handleViewport(firstVisible: number, lastVisible: number): void {
     this.optimizer?.updateViewport(firstVisible, lastVisible);
     this.refreshObserverWindow();
     this.updateStatus();
+  }
+
+  private handleResizes(entries: readonly ResizeObserverEntry[]): void {
+    for (const entry of entries) {
+      if (!(entry.target instanceof HTMLElement) || !this.registry.has(entry.target)) continue;
+      this.optimizer?.recordHeight(entry.target, entry.target.getBoundingClientRect().height || entry.contentRect.height);
+    }
   }
 
   private handleExpandBefore(): void {
@@ -132,6 +208,7 @@ class ContentController {
   }
 
   private handleRootChanged(): void {
+    if (!this.currentRoot) return;
     this.teardown();
     this.beginDiscovery();
   }
@@ -148,8 +225,6 @@ class ContentController {
 
   private refreshObserverWindow(): void {
     if (!this.observers || !this.optimizer) return;
-    const infos = this.registry.ordered();
-    this.observers.updateTurns(infos);
     this.observers.setCurrentWindowStart(this.optimizer.windowState.start);
   }
 
@@ -158,7 +233,17 @@ class ContentController {
   }
 
   private async refreshConfig(): Promise<void> {
+    const previous = this.config;
     this.config = await loadConfig();
+    if (previous.mode !== this.config.mode || previous.preloadMargin !== this.config.preloadMargin) {
+      const root = this.currentRoot;
+      if (root?.isConnected) {
+        this.teardown();
+        this.mount(root);
+        return;
+      }
+    }
+    if (this.config.enabled && !this.tabDisabled && this.currentRoot) markLongMarkdown(this.currentRoot);
     this.optimizer?.updateConfig(this.effectiveConfig());
     this.reconcile();
   }
@@ -201,6 +286,7 @@ class ContentController {
     }
     if (request?.type === 'enable-for-tab') {
       this.tabDisabled = false;
+      if (this.config.enabled && this.currentRoot) markLongMarkdown(this.currentRoot);
       this.optimizer?.updateConfig(this.effectiveConfig());
       this.updateStatus();
       sendResponse({ ok: true, stats: this.getStats() });
@@ -210,6 +296,8 @@ class ContentController {
   };
 
   private teardown(): void {
+    this.mountGeneration += 1;
+    this.scheduler.cancelPending();
     this.stopDiscoveryObserver();
     this.observers?.destroy();
     this.optimizer?.destroy();

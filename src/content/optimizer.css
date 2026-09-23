@@ -1,7 +1,13 @@
-/*
- * The extension only opts in elements marked by its content script. This keeps
- * unsupported ChatGPT layouts completely untouched (fail-open).
- */
+/* Safe mode leaves turn discovery to CSS, including turns added after mount. */
+[data-cgpt-optimizer="safe"] :is(
+  [data-testid^="conversation-turn-"],
+  [data-testid^="conversation-turn"]
+) {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 420px;
+}
+
+/* Window modes opt in only the turns discovered by the content script. */
 [data-cgpt-optimizer-turn="true"] {
   content-visibility: auto;
   contain-intrinsic-size: auto 420px;
@@ -16,12 +22,23 @@
   content-visibility: auto;
 }
 
-/*
- * A current ChatGPT response can contain hundreds of Markdown blocks inside
- * one conversation turn. Add smaller skip-rendering boundaries for those long
- * replies so a partially visible turn does not force every block to render.
- */
-[data-cgpt-optimizer-turn="true"] [data-message-author-role] [class~="markdown"]:has(> :nth-child(n + 24)) > * {
+/* Experimental: retain the turn wrapper's measured block size and suppress child rendering. */
+[data-cgpt-optimizer-state="cold"] {
+  box-sizing: border-box;
+  block-size: var(--cgpt-frozen-height, 420px);
+  min-block-size: var(--cgpt-frozen-height, 420px);
+  max-block-size: var(--cgpt-frozen-height, 420px);
+  contain: layout paint style size;
+  overflow: clip;
+}
+
+[data-cgpt-optimizer-state="cold"] > * {
+  display: none !important;
+}
+
+/* Long assistant replies get stable, direct-child rendering boundaries without :has(). */
+[data-cgpt-optimizer="safe"] [data-message-author-role] [data-cgpt-long-markdown] > *,
+[data-cgpt-optimizer-turn="true"] [data-message-author-role] [data-cgpt-long-markdown] > * {
   content-visibility: auto;
   contain-intrinsic-size: auto 80px;
 }

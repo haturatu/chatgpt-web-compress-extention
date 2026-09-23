@@ -23,8 +23,8 @@
             <span><span class="label">Enabled</span><span class="hint">Apply optimization on supported ChatGPT conversations</span></span>
             <input id="enabled" name="enabled" type="checkbox" role="switch" />
           </label>
-          <label class="field" for="mode"><span class="label">Mode</span><span class="hint">Safe uses CSS containment only. Other modes use content-visibility hidden for older turns.</span>
-            <select id="mode" name="mode"><option value="safe">Safe · CSS containment</option><option value="balanced">Balanced · window mode</option><option value="aggressive">Aggressive · tighter window</option></select>
+          <label class="field" for="mode"><span class="label">Mode</span><span id="mode-hint" class="hint"></span>
+            <select id="mode" name="mode"><option value="safe">Safe · CSS-native</option><option value="balanced">Balanced · window mode</option><option value="aggressive">Aggressive · tighter window</option><option value="memory-saver">Memory Saver · experimental</option></select>
           </label>
           <div class="two-col">
             <label class="field" for="active-window"><span class="label">Active window</span><span class="hint">Turns kept ready around the viewport</span><input id="active-window" name="activeWindow" type="number" min="20" max="240" step="5" required /></label>
@@ -41,7 +41,7 @@
         <section class="panel note-panel" aria-labelledby="compatibility-heading">
           <p class="eyebrow">COMPATIBILITY</p>
           <h2 id="compatibility-heading">Safe by default</h2>
-          <p>The extension never calls <code>remove()</code>, <code>display: none</code>, or replaces conversation turns. If the page structure is unfamiliar, it stays inactive until a supported conversation is detected.</p>
+          <p>Safe, Balanced, and Aggressive keep conversation nodes attached and do not use <code>display: none</code>. Memory Saver is an opt-in experiment that hides off-window turn children and preserves a measured height. It can affect page search, accessibility, and ChatGPT controls; switch back to another mode if a turn behaves incorrectly. If the page structure is unfamiliar, optimization stays inactive.</p>
         </section>
 
         <div class="actions"><button type="submit" class="primary-button">Save settings</button><span id="message" class="message" role="status" aria-live="polite"></span></div>

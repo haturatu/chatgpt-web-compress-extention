@@ -32,6 +32,11 @@ function setMessage(message: string): void {
 function renderConfig(): void {
   ($('enabled') as HTMLInputElement).checked = config.enabled;
   ($('mode') as HTMLSelectElement).value = config.mode;
+  $('mode-hint').textContent = config.mode === 'memory-saver'
+    ? 'Hides off-window message content. Search, accessibility, and ChatGPT controls may be affected.'
+    : config.mode === 'safe'
+      ? 'Uses CSS containment; the browser tracks turns without scroll-time extension work.'
+      : 'Keeps a moving group of turns active around your viewport.';
   ($('active-window') as HTMLInputElement).value = String(config.activeWindow);
   ($('batch-size') as HTMLInputElement).value = String(config.batchSize);
   ($('auto-load') as HTMLInputElement).checked = config.autoLoad;

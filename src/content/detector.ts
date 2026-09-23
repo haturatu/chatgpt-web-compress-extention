@@ -7,13 +7,25 @@ const unique = (elements: HTMLElement[]): HTMLElement[] =>
   Array.from(new Set(elements));
 
 export function isConversationTurn(element: HTMLElement): boolean {
-  if (!element.isConnected || element.getBoundingClientRect().width === 0) return false;
+  if (!element.isConnected) return false;
   if (!element.closest('main, [role="main"]')) return false;
 
   const testId = element.dataset.testid ?? '';
-  const hasConversationTestId = testId.startsWith('conversation-turn');
+  if (testId.startsWith('conversation-turn')) return true;
   const hasMessageRole = Boolean(element.querySelector('[data-message-author-role]'));
-  return hasConversationTestId || hasMessageRole;
+  if (!hasMessageRole) return false;
+
+  const visibilityElement = element as HTMLElement & {
+    checkVisibility?: (options?: { contentVisibilityAuto?: boolean }) => boolean;
+  };
+  if (visibilityElement.checkVisibility) {
+    try {
+      return visibilityElement.checkVisibility({ contentVisibilityAuto: true });
+    } catch {
+      // Older engines can ignore the option shape even when the method exists.
+    }
+  }
+  return element.getBoundingClientRect().width !== 0;
 }
 
 function collectCandidates(root: ParentNode, selector: string): HTMLElement[] {
@@ -42,21 +54,65 @@ export function detectTurns(root: ParentNode): HTMLElement[] {
   return collectHeuristicCandidates(root);
 }
 
+export async function detectTurnsYielding(
+  root: ParentNode,
+  yieldToBrowser: () => Promise<void>,
+  chunkSize = 64,
+  shouldContinue: () => boolean = () => true
+): Promise<HTMLElement[]> {
+  for (const selector of STRONG_TURN_SELECTORS) {
+    const nodes = root.querySelectorAll<HTMLElement>(selector);
+    if (nodes.length === 0) continue;
+    const candidates: HTMLElement[] = [];
+    for (let index = 0; index < nodes.length; index += 1) {
+      if (!shouldContinue()) return [];
+      const element = nodes[index]!;
+      if (isConversationTurn(element)) candidates.push(element);
+      if ((index + 1) % chunkSize === 0 && index + 1 < nodes.length) {
+        await yieldToBrowser();
+        if (!shouldContinue()) return [];
+      }
+    }
+    if (candidates.length > 0) return unique(candidates);
+  }
+
+  const articles = root.querySelectorAll<HTMLElement>(TURN_SELECTORS[2]);
+  const articleCandidates: HTMLElement[] = [];
+  for (let index = 0; index < articles.length; index += 1) {
+    if (!shouldContinue()) return [];
+    const element = articles[index]!;
+    if (isConversationTurn(element)) articleCandidates.push(element);
+    if ((index + 1) % chunkSize === 0 && index + 1 < articles.length) {
+      await yieldToBrowser();
+      if (!shouldContinue()) return [];
+    }
+  }
+  if (articleCandidates.length > 0) return unique(articleCandidates);
+
+  const messages = root.querySelectorAll<HTMLElement>('[data-message-author-role]');
+  const candidates: HTMLElement[] = [];
+  const seen = new Set<HTMLElement>();
+  for (let index = 0; index < messages.length; index += 1) {
+    if (!shouldContinue()) return [];
+    const message = messages[index]!;
+    const markedParent = message.closest<HTMLElement>('[data-testid^="conversation-turn"]');
+    const candidate = markedParent ?? message.closest<HTMLElement>('article') ?? message.parentElement;
+    if (candidate && !seen.has(candidate) && isConversationTurn(candidate)) {
+      seen.add(candidate);
+      candidates.push(candidate);
+    }
+    if ((index + 1) % chunkSize === 0 && index + 1 < messages.length) {
+      await yieldToBrowser();
+      if (!shouldContinue()) return [];
+    }
+  }
+  return candidates;
+}
+
 export function extractTurnsFromNode(node: Node): HTMLElement[] {
   if (!(node instanceof HTMLElement)) return [];
   const own = TURN_SELECTORS.some((selector) => node.matches(selector)) ? [node] : [];
   return unique([...own, ...detectTurns(node)]);
-}
-
-function commonAncestor(elements: HTMLElement[]): HTMLElement | null {
-  const [first, ...rest] = elements;
-  if (!first) return null;
-  let ancestor: HTMLElement | null = first.parentElement;
-  while (ancestor) {
-    if (rest.every((element) => ancestor?.contains(element))) return ancestor;
-    ancestor = ancestor.parentElement;
-  }
-  return null;
 }
 
 export function isValidConversationRoot(root: HTMLElement): boolean {
@@ -72,10 +128,16 @@ export function findConversationRoot(documentRoot: Document | HTMLElement): HTML
   ]);
 
   for (const main of mainCandidates) {
-    const turns = detectTurns(main);
-    if (turns.length === 0) continue;
-    const root = commonAncestor(turns) ?? main;
-    if (isValidConversationRoot(root)) return root;
+    if (!main.isConnected) continue;
+    const strongTurn = main.querySelector<HTMLElement>(STRONG_TURN_SELECTORS.join(','));
+    if (strongTurn?.isConnected) return main;
+
+    const article = main.querySelector<HTMLElement>(TURN_SELECTORS[2]);
+    if (article && isConversationTurn(article)) return main;
+
+    const message = main.querySelector<HTMLElement>('[data-message-author-role]');
+    const heuristicTurn = message?.closest<HTMLElement>('article') ?? message?.parentElement;
+    if (heuristicTurn && isConversationTurn(heuristicTurn)) return main;
   }
 
   return null;

@@ -11,12 +11,13 @@ describe('TurnRegistry', () => {
 
     const registry = new TurnRegistry();
     registry.addMany([first, second]);
-    expect(registry.ordered().map((info) => info.element)).toEqual([second, first]);
-    expect(registry.ordered().map((info) => info.index)).toEqual([0, 1]);
+    expect(registry.elements()).toEqual([second, first]);
+    expect(registry.indexOf(second)).toBe(0);
+    expect(registry.indexOf(first)).toBe(1);
 
     first.remove();
     registry.cleanupDisconnected();
     expect(registry.count()).toBe(1);
-    expect(registry.getByIndex(0)?.element).toBe(second);
+    expect(registry.elementAt(0)).toBe(second);
   });
 });
