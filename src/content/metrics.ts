@@ -1,7 +1,6 @@
 export class PerformanceMetrics {
   private readonly observer: PerformanceObserver | null;
   private longTaskCount = 0;
-  private domElements = 0;
 
   constructor() {
     if (typeof PerformanceObserver === 'undefined') {
@@ -23,14 +22,6 @@ export class PerformanceMetrics {
 
   get longTasks(): number {
     return this.longTaskCount;
-  }
-
-  refreshDomCount(): void {
-    this.domElements = document.documentElement?.getElementsByTagName('*').length ?? 0;
-  }
-
-  get domCount(): number {
-    return this.domElements;
   }
 
   destroy(): void {

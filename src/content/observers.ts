@@ -1,5 +1,4 @@
 import { BatchLoadGate } from './scheduler';
-import { HeightMeasurements } from './measurements';
 import { TurnRegistry } from './registry';
 import { findScrollableAncestor } from './scrolling';
 import type { TurnInfo } from '../shared/types';
@@ -13,31 +12,28 @@ export interface ConversationObserverCallbacks {
 
 export class ConversationObservers {
   private readonly mutationObserver: MutationObserver;
-  private readonly intersectionObserver: IntersectionObserver | null;
   private readonly boundaryObserver: IntersectionObserver | null;
-  private readonly measurements: HeightMeasurements;
+  private readonly resizeObserver: ResizeObserver | null;
   private readonly loadGate = new BatchLoadGate();
-  private readonly visibleElements = new Set<HTMLElement>();
-  private readonly observedElements = new Set<HTMLElement>();
+  private readonly visibleTurns = new Set<HTMLElement>();
   private boundary: HTMLElement | null = null;
   private scrollContainer: HTMLElement | null = null;
   private parentObserver: MutationObserver | null = null;
   private bodyObserver: MutationObserver | null = null;
   private callbacks: ConversationObserverCallbacks | null = null;
+  private currentWindowStart = 0;
+  private viewportUpdateScheduled = false;
+  private lastReportedFirst = -1;
+  private lastReportedLast = -1;
 
   constructor(private readonly registry: TurnRegistry, preloadMargin: number) {
-    this.measurements = new HeightMeasurements(registry);
     this.mutationObserver = new MutationObserver((records) => {
-      if (records.length > 0) this.callbacks?.onMutations(records);
+      if (records.length > 0) {
+        this.callbacks?.onMutations(records);
+        this.scheduleViewportUpdate();
+      }
     });
 
-    this.intersectionObserver = typeof IntersectionObserver === 'undefined'
-      ? null
-      : new IntersectionObserver((entries) => this.handleIntersections(entries), {
-        root: null,
-        rootMargin: '0px',
-        threshold: [0, 0.01, 1]
-      });
     this.boundaryObserver = typeof IntersectionObserver === 'undefined'
       ? null
       : new IntersectionObserver((entries) => this.handleBoundaryIntersections(entries), {
@@ -45,6 +41,9 @@ export class ConversationObservers {
         rootMargin: `${preloadMargin}px 0px`,
         threshold: 0
       });
+    this.resizeObserver = typeof ResizeObserver === 'undefined'
+      ? null
+      : new ResizeObserver(() => this.scheduleViewportUpdate());
   }
 
   mount(root: HTMLElement, callbacks: ConversationObserverCallbacks): void {
@@ -70,31 +69,17 @@ export class ConversationObservers {
     this.scrollContainer = findScrollableAncestor(firstTurn);
     if (this.scrollContainer) {
       this.scrollContainer.addEventListener('scroll', this.handleScroll, { passive: true });
+      this.resizeObserver?.observe(this.scrollContainer);
     } else {
       window.addEventListener('scroll', this.handleScroll, { passive: true });
     }
+    window.addEventListener('resize', this.scheduleViewportUpdate, { passive: true });
     window.addEventListener('popstate', this.handleNavigation);
     window.addEventListener('hashchange', this.handleNavigation);
+    this.scheduleViewportUpdate();
   }
 
   updateTurns(infos: TurnInfo[]): void {
-    const elements = new Set(infos.map((info) => info.element));
-    for (const element of this.observedElements) {
-      if (elements.has(element)) continue;
-      this.intersectionObserver?.unobserve(element);
-      this.boundaryObserver?.unobserve(element);
-      this.measurements.unobserve([element]);
-      this.observedElements.delete(element);
-      this.visibleElements.delete(element);
-    }
-
-    for (const info of infos) {
-      if (this.observedElements.has(info.element)) continue;
-      this.observedElements.add(info.element);
-      this.intersectionObserver?.observe(info.element);
-      this.measurements.observe([info.element]);
-    }
-
     this.setBoundary(infos.find((info) => info.index < this.currentWindowStart)?.element ?? null);
   }
 
@@ -105,9 +90,8 @@ export class ConversationObservers {
 
   destroy(): void {
     this.mutationObserver.disconnect();
-    this.intersectionObserver?.disconnect();
     this.boundaryObserver?.disconnect();
-    this.measurements.destroy();
+    this.resizeObserver?.disconnect();
     this.parentObserver?.disconnect();
     this.bodyObserver?.disconnect();
     if (this.scrollContainer) {
@@ -116,44 +100,17 @@ export class ConversationObservers {
     } else {
       window.removeEventListener('scroll', this.handleScroll);
     }
+    window.removeEventListener('resize', this.scheduleViewportUpdate);
     window.removeEventListener('popstate', this.handleNavigation);
     window.removeEventListener('hashchange', this.handleNavigation);
-    this.visibleElements.clear();
-    this.observedElements.clear();
+    this.boundary = null;
+    this.visibleTurns.clear();
     this.callbacks = null;
   }
-
-  private currentWindowStart = 0;
 
   setCurrentWindowStart(start: number): void {
     this.currentWindowStart = start;
     this.setWindowStart(start);
-  }
-
-  private handleIntersections(entries: IntersectionObserverEntry[]): void {
-    for (const entry of entries) {
-      const element = entry.target as HTMLElement;
-      if (entry.isIntersecting) {
-        this.visibleElements.add(element);
-        const info = this.registry.get(element);
-        if (info) {
-          info.visible = true;
-          info.lastSeen = performance.now();
-        }
-      } else {
-        this.visibleElements.delete(element);
-        const info = this.registry.get(element);
-        if (info) info.visible = false;
-      }
-    }
-
-    const visibleIndices = Array.from(this.visibleElements)
-      .map((element) => this.registry.get(element)?.index)
-      .filter((index): index is number => index !== undefined)
-      .sort((a, b) => a - b);
-    if (visibleIndices.length > 0) {
-      this.callbacks?.onViewport(visibleIndices[0] ?? 0, visibleIndices[visibleIndices.length - 1] ?? 0);
-    }
   }
 
   private handleBoundaryIntersections(entries: IntersectionObserverEntry[]): void {
@@ -174,8 +131,101 @@ export class ConversationObservers {
     if (this.boundary) this.boundaryObserver?.observe(this.boundary);
   }
 
+  private scheduleViewportUpdate = (): void => {
+    if (this.viewportUpdateScheduled) return;
+    this.viewportUpdateScheduled = true;
+    const update = (): void => {
+      this.viewportUpdateScheduled = false;
+      this.updateViewportFromLayout();
+    };
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(update);
+    else window.setTimeout(update, 0);
+  };
+
+  private updateViewportFromLayout(): void {
+    const infos = this.registry.ordered();
+    if (infos.length === 0) {
+      this.clearVisibleTurnTargets();
+      return;
+    }
+
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+    const scrollport = this.scrollContainer?.getBoundingClientRect();
+    const viewportTop = Math.max(0, scrollport?.top ?? 0);
+    const viewportBottom = Math.min(viewportHeight, scrollport?.bottom ?? viewportHeight);
+    if (viewportBottom <= viewportTop) {
+      this.clearVisibleTurnTargets();
+      return;
+    }
+
+    // Turns are in vertical DOM order, so locate the visible range without
+    // registering every turn with a native IntersectionObserver.
+    let low = 0;
+    let high = infos.length;
+    while (low < high) {
+      const middle = (low + high) >>> 1;
+      if (infos[middle]!.element.getBoundingClientRect().bottom > viewportTop) high = middle;
+      else low = middle + 1;
+    }
+    const firstVisible = low;
+    if (firstVisible >= infos.length || infos[firstVisible]!.element.getBoundingClientRect().bottom <= viewportTop) {
+      this.clearVisibleTurnTargets();
+      return;
+    }
+
+    low = firstVisible;
+    high = infos.length;
+    while (low < high) {
+      const middle = (low + high) >>> 1;
+      if (infos[middle]!.element.getBoundingClientRect().top < viewportBottom) low = middle + 1;
+      else high = middle;
+    }
+    const lastVisible = low - 1;
+    if (lastVisible < firstVisible || infos[lastVisible]!.element.getBoundingClientRect().top >= viewportBottom) {
+      this.clearVisibleTurnTargets();
+      return;
+    }
+
+    this.syncVisibleTurnTargets(infos, firstVisible, lastVisible);
+    if (firstVisible === this.lastReportedFirst && lastVisible === this.lastReportedLast) return;
+    this.lastReportedFirst = firstVisible;
+    this.lastReportedLast = lastVisible;
+    this.callbacks?.onViewport(firstVisible, lastVisible);
+  }
+
+  private syncVisibleTurnTargets(infos: TurnInfo[], first: number, last: number): void {
+    if (!this.resizeObserver) return;
+    let unchanged = this.visibleTurns.size === last - first + 1;
+    if (unchanged) {
+      for (let index = first; index <= last; index += 1) {
+        if (!this.visibleTurns.has(infos[index]!.element)) {
+          unchanged = false;
+          break;
+        }
+      }
+    }
+    if (unchanged) return;
+
+    this.clearVisibleTurnTargets();
+    for (let index = first; index <= last; index += 1) {
+      const element = infos[index]!.element;
+      this.visibleTurns.add(element);
+      this.resizeObserver.observe(element);
+    }
+  }
+
+  private clearVisibleTurnTargets(): void {
+    if (this.resizeObserver) {
+      for (const element of this.visibleTurns) this.resizeObserver.unobserve(element);
+    }
+    this.visibleTurns.clear();
+    this.lastReportedFirst = -1;
+    this.lastReportedLast = -1;
+  }
+
   private handleScroll = (): void => {
     this.loadGate.onScroll();
+    this.scheduleViewportUpdate();
   };
 
   private handleNavigation = (): void => {

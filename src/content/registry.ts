@@ -2,22 +2,18 @@ import type { TurnInfo } from '../shared/types';
 
 export class TurnRegistry {
   private readonly turns = new Map<HTMLElement, TurnInfo>();
+  private orderedCache: TurnInfo[] | null = null;
 
   add(element: HTMLElement): TurnInfo {
     const current = this.turns.get(element);
-    if (current) {
-      current.lastSeen = performance.now();
-      return current;
-    }
+    if (current) return current;
 
     const info: TurnInfo = {
       element,
-      index: 0,
-      height: 0,
-      visible: false,
-      lastSeen: performance.now()
+      index: 0
     };
     this.turns.set(element, info);
+    this.orderedCache = null;
     return info;
   }
 
@@ -27,32 +23,41 @@ export class TurnRegistry {
   }
 
   remove(element: HTMLElement): void {
-    this.turns.delete(element);
+    if (this.turns.delete(element)) this.orderedCache = null;
   }
 
   cleanupDisconnected(): void {
+    let changed = false;
     for (const [element] of this.turns) {
-      if (!element.isConnected) this.turns.delete(element);
+      if (!element.isConnected) {
+        this.turns.delete(element);
+        changed = true;
+      }
     }
-    this.reindex();
+    if (changed) this.reindex();
   }
 
   clear(): void {
     this.turns.clear();
+    this.orderedCache = [];
   }
 
   reindex(): void {
+    this.orderedCache = null;
     this.ordered().forEach((info, index) => {
       info.index = index;
     });
   }
 
   ordered(): TurnInfo[] {
-    return Array.from(this.turns.values()).sort((a, b) => {
-      if (a.element === b.element) return 0;
-      const position = a.element.compareDocumentPosition(b.element);
-      return position & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
-    });
+    if (!this.orderedCache) {
+      this.orderedCache = Array.from(this.turns.values()).sort((a, b) => {
+        if (a.element === b.element) return 0;
+        const position = a.element.compareDocumentPosition(b.element);
+        return position & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
+      });
+    }
+    return this.orderedCache;
   }
 
   get(element: HTMLElement): TurnInfo | undefined {
