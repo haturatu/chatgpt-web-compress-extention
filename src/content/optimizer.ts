@@ -1,5 +1,6 @@
 import { OPTIMIZER_STATE_ATTRIBUTE, OPTIMIZER_TURN_ATTRIBUTE } from './selectors';
 import { TurnRegistry } from './registry';
+import { findScrollableAncestor } from './scrolling';
 import type { OptimizerConfig, OptimizerStats, ViewportState, WindowState } from '../shared/types';
 
 const STREAMING_GRACE_MS = 3000;
@@ -70,7 +71,9 @@ export class Optimizer {
       const after = anchor.getBoundingClientRect().top;
       const delta = after - before;
       if (Math.abs(delta) < 0.5) return;
-      window.scrollBy({ top: delta, behavior: 'auto' });
+      const scrollContainer = findScrollableAncestor(anchor);
+      if (scrollContainer) scrollContainer.scrollBy({ top: delta, behavior: 'auto' });
+      else window.scrollBy({ top: delta, behavior: 'auto' });
     });
   }
 
@@ -160,9 +163,14 @@ export class Optimizer {
 
   private findTopVisibleTurn(): HTMLElement | null {
     const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
-    const visible = this.registry.ordered().filter((info) => {
+    const turns = this.registry.ordered();
+    const scrollContainer = turns[0] ? findScrollableAncestor(turns[0].element) : null;
+    const scrollport = scrollContainer?.getBoundingClientRect();
+    const viewportTop = Math.max(0, scrollport?.top ?? 0);
+    const viewportBottom = Math.min(viewportHeight, scrollport?.bottom ?? viewportHeight);
+    const visible = turns.filter((info) => {
       const rect = info.element.getBoundingClientRect();
-      return rect.bottom > 0 && rect.top < viewportHeight;
+      return rect.bottom > viewportTop && rect.top < viewportBottom;
     });
     return visible[0]?.element ?? this.registry.getByIndex(this.viewport.firstVisible)?.element ?? null;
   }

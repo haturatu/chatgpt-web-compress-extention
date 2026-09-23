@@ -16,6 +16,16 @@
   content-visibility: auto;
 }
 
+/*
+ * A current ChatGPT response can contain hundreds of Markdown blocks inside
+ * one conversation turn. Add smaller skip-rendering boundaries for those long
+ * replies so a partially visible turn does not force every block to render.
+ */
+[data-cgpt-optimizer-turn="true"] [data-message-author-role] [class~="markdown"]:has(> :nth-child(n + 24)) > * {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 80px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   [data-cgpt-optimizer-turn="true"] {
     scroll-behavior: auto;
