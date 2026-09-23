@@ -13,3 +13,5 @@ export const MAIN_SELECTORS = [
 
 export const OPTIMIZER_TURN_ATTRIBUTE = 'data-cgpt-optimizer-turn';
 export const OPTIMIZER_STATE_ATTRIBUTE = 'data-cgpt-optimizer-state';
+export const OPTIMIZER_ROOT_ATTRIBUTE = 'data-cgpt-optimizer';
+export const LONG_MARKDOWN_ATTRIBUTE = 'data-cgpt-long-markdown';

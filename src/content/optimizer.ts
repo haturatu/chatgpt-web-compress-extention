@@ -1,9 +1,19 @@
-import { OPTIMIZER_STATE_ATTRIBUTE, OPTIMIZER_TURN_ATTRIBUTE } from './selectors';
+import {
+  LONG_MARKDOWN_ATTRIBUTE,
+  OPTIMIZER_ROOT_ATTRIBUTE,
+  OPTIMIZER_STATE_ATTRIBUTE,
+  OPTIMIZER_TURN_ATTRIBUTE
+} from './selectors';
 import { TurnRegistry } from './registry';
+import { detectTurns } from './detector';
 import { findScrollableAncestor } from './scrolling';
 import type { OptimizerConfig, OptimizerStats, ViewportState, WindowState } from '../shared/types';
 
 const STREAMING_GRACE_MS = 3000;
+const FALLBACK_FROZEN_HEIGHT = 420;
+
+type OptimizerState = 'active' | 'dormant' | 'cold';
+interface IndexRange { start: number; end: number }
 
 const raf = (callback: () => void): void => {
   if (typeof requestAnimationFrame === 'function') {
@@ -23,6 +33,37 @@ function hasStreamingMarker(element: HTMLElement): boolean {
   ));
 }
 
+function mergeRanges(ranges: IndexRange[]): IndexRange[] {
+  const sorted = ranges.filter((range) => range.end >= range.start).sort((a, b) => a.start - b.start);
+  const merged: IndexRange[] = [];
+  for (const range of sorted) {
+    const last = merged.at(-1);
+    if (!last || range.start > last.end + 1) merged.push({ ...range });
+    else last.end = Math.max(last.end, range.end);
+  }
+  return merged;
+}
+
+function forRangeDifference(
+  source: readonly IndexRange[],
+  covered: readonly IndexRange[],
+  visit: (index: number) => void
+): void {
+  for (const range of source) {
+    let cursor = range.start;
+    for (const cover of covered) {
+      if (cover.end < cursor) continue;
+      if (cover.start > range.end) break;
+      if (cover.start > cursor) {
+        for (let index = cursor; index < Math.min(cover.start, range.end + 1); index += 1) visit(index);
+      }
+      cursor = Math.max(cursor, cover.end + 1);
+      if (cursor > range.end) break;
+    }
+    for (let index = cursor; index <= range.end; index += 1) visit(index);
+  }
+}
+
 export class Optimizer {
   private config: OptimizerConfig;
   private viewport: ViewportState = { firstVisible: 0, lastVisible: 0 };
@@ -30,8 +71,19 @@ export class Optimizer {
   private manualStart: number | null = null;
   private streamingGraceUntil = 0;
   private destroyed = false;
+  private appliedRanges: IndexRange[] = [];
+  private appliedStructureRevision = -1;
+  private initializedCount = 0;
+  private activeCount = 0;
+  private dormantCount = 0;
+  private appliedMode: OptimizerConfig['mode'] | null = null;
+  private readonly measuredHeights = new WeakMap<HTMLElement, number>();
 
-  constructor(private readonly registry: TurnRegistry, config: OptimizerConfig) {
+  constructor(
+    private readonly registry: TurnRegistry,
+    config: OptimizerConfig,
+    private readonly root: HTMLElement | null = null
+  ) {
     this.config = config;
   }
 
@@ -48,19 +100,19 @@ export class Optimizer {
   }
 
   reconcile(): void {
-    if (!this.config.enabled) {
-      this.clearManagedAttributes();
-      return;
-    }
-    this.registry.reindex();
     this.apply();
+  }
+
+  recordHeight(element: HTMLElement, height: number): void {
+    if (!Number.isFinite(height) || height <= 0) return;
+    this.measuredHeights.set(element, height);
   }
 
   expandBefore(): void {
     if (!this.config.enabled || this.config.mode === 'safe' || !this.config.autoLoad) return;
     const current = this.window.start;
     if (current <= 0) return;
-    const anchor = this.findTopVisibleTurn();
+    const anchor = this.registry.elementAt(this.viewport.firstVisible) ?? this.registry.elementAt(current);
     const before = anchor?.getBoundingClientRect().top;
     this.manualStart = Math.max(0, current - this.config.batchSize);
     this.apply();
@@ -86,9 +138,15 @@ export class Optimizer {
   }
 
   getStats(): Pick<OptimizerStats, 'turns' | 'active' | 'dormant'> {
-    const turns = this.registry.ordered();
-    const active = turns.filter((info) => info.element.dataset.cgptOptimizerState === 'active').length;
-    return { turns: turns.length, active, dormant: Math.max(0, turns.length - active) };
+    const turns = this.config.mode === 'safe' && this.root
+      ? detectTurns(this.root).length
+      : this.registry.count();
+    const active = !this.config.enabled
+      ? 0
+      : this.config.mode === 'safe'
+        ? turns
+        : this.activeCount;
+    return { turns, active, dormant: Math.max(0, turns - active) };
   }
 
   destroy(): void {
@@ -99,37 +157,102 @@ export class Optimizer {
 
   private apply(): void {
     if (this.destroyed) return;
-    const turns = this.registry.ordered();
-    if (turns.length === 0) return;
     if (!this.config.enabled) {
       this.clearManagedAttributes();
+      this.appliedMode = this.config.mode;
       return;
     }
 
+    const turns = this.registry.elements();
     if (this.config.mode === 'safe') {
-      this.window = { start: 0, end: turns.length - 1 };
-      turns.forEach((info) => this.setState(info.element, 'active'));
+      this.enterSafeMode(turns);
       return;
     }
 
-    const range = this.calculateWindow(turns.length);
+    this.root?.removeAttribute(OPTIMIZER_ROOT_ATTRIBUTE);
+    if (turns.length === 0) {
+      this.window = { start: 0, end: 0 };
+      this.appliedRanges = [];
+      this.appliedMode = this.config.mode;
+      this.appliedStructureRevision = this.registry.structureRevision;
+      this.initializedCount = 0;
+      this.activeCount = 0;
+      this.dormantCount = 0;
+      return;
+    }
+
+    const total = turns.length;
+    const range = this.calculateWindow(total);
     this.window = range;
-    const tailStart = Math.max(0, turns.length - this.config.pinnedTail);
-    const latest = turns[turns.length - 1];
-    const latestIsStreaming = Boolean(latest && hasStreamingMarker(latest.element));
+    const tailStart = Math.max(0, total - this.config.pinnedTail);
+    const latest = turns[total - 1];
+    const latestIsStreaming = Boolean(latest && hasStreamingMarker(latest));
     if (latestIsStreaming) this.streamingGraceUntil = Date.now() + STREAMING_GRACE_MS;
     const keepLatest = Date.now() < this.streamingGraceUntil;
+    const nextRanges = mergeRanges([
+      range,
+      { start: tailStart, end: total - 1 },
+      ...(keepLatest ? [{ start: total - 1, end: total - 1 }] : [])
+    ]);
 
-    turns.forEach((info, index) => {
-      const inWindow = index >= range.start && index <= range.end;
-      const pinned = index >= tailStart || (keepLatest && index === turns.length - 1);
-      this.setState(info.element, inWindow || pinned ? 'active' : 'dormant');
-    });
+    const structureChanged = this.appliedMode !== this.config.mode
+      || this.appliedStructureRevision !== this.registry.structureRevision
+      || total < this.initializedCount;
+    if (structureChanged) {
+      if (this.config.mode === 'memory-saver' && this.initializedCount === 0) {
+        // Read all baseline sizes before writing cold-state styles to avoid read/write layout thrashing.
+        for (const element of turns) {
+          if (!this.measuredHeights.has(element)) this.recordHeight(element, element.getBoundingClientRect().height);
+        }
+      }
+      let nextActiveCount = 0;
+      for (let index = 0; index < total; index += 1) {
+        const active = this.isInRanges(index, nextRanges);
+        this.writeState(turns[index]!, this.stateFor(active));
+        if (active) nextActiveCount += 1;
+      }
+      this.activeCount = nextActiveCount;
+      this.dormantCount = total - nextActiveCount;
+    } else {
+      const oldRanges = this.appliedRanges;
+      forRangeDifference(oldRanges, nextRanges, (index) => {
+        const element = turns[index];
+        if (element) this.setState(element, this.stateFor(false));
+      });
+      forRangeDifference(nextRanges, oldRanges, (index) => {
+        const element = turns[index];
+        if (element) this.setState(element, 'active');
+      });
+      for (let index = this.initializedCount; index < total; index += 1) {
+        const element = turns[index]!;
+        this.setState(element, this.stateFor(this.isInRanges(index, nextRanges)));
+      }
+    }
+
+    this.appliedRanges = nextRanges;
+    this.appliedStructureRevision = this.registry.structureRevision;
+    this.initializedCount = total;
+    this.appliedMode = this.config.mode;
+  }
+
+  private enterSafeMode(turns: readonly HTMLElement[]): void {
+    const entering = this.appliedMode !== 'safe';
+    if (entering && turns.some((turn) => turn.hasAttribute(OPTIMIZER_TURN_ATTRIBUTE))) {
+      this.clearTurnAttributes(turns);
+    }
+    this.root?.setAttribute(OPTIMIZER_ROOT_ATTRIBUTE, 'safe');
+    this.window = { start: 0, end: Math.max(0, turns.length - 1) };
+    this.appliedRanges = [];
+    this.appliedStructureRevision = this.registry.structureRevision;
+    this.initializedCount = turns.length;
+    this.activeCount = 0;
+    this.dormantCount = 0;
+    this.appliedMode = 'safe';
   }
 
   private calculateWindow(total: number): WindowState {
     const maxIndex = total - 1;
-    const windowSize = this.config.mode === 'aggressive'
+    const windowSize = this.config.mode === 'aggressive' || this.config.mode === 'memory-saver'
       ? this.config.activeWindow
       : this.config.activeWindow + 20;
     if (total <= windowSize + this.config.pinnedTail) {
@@ -149,29 +272,63 @@ export class Optimizer {
     return { start, end };
   }
 
-  private setState(element: HTMLElement, state: 'active' | 'dormant'): void {
-    element.setAttribute(OPTIMIZER_TURN_ATTRIBUTE, 'true');
-    element.setAttribute(OPTIMIZER_STATE_ATTRIBUTE, state);
+  private stateFor(active: boolean): OptimizerState {
+    if (active) return 'active';
+    return this.config.mode === 'memory-saver' ? 'cold' : 'dormant';
   }
 
-  private clearManagedAttributes(): void {
-    for (const info of this.registry.ordered()) {
-      info.element.removeAttribute(OPTIMIZER_TURN_ATTRIBUTE);
-      info.element.removeAttribute(OPTIMIZER_STATE_ATTRIBUTE);
+  private isInRanges(index: number, ranges: readonly IndexRange[]): boolean {
+    return ranges.some((range) => index >= range.start && index <= range.end);
+  }
+
+  private setState(element: HTMLElement, state: OptimizerState): void {
+    const previous = element.dataset.cgptOptimizerState;
+    if (previous === state && element.hasAttribute(OPTIMIZER_TURN_ATTRIBUTE)) return;
+    if (previous === 'active') this.activeCount = Math.max(0, this.activeCount - 1);
+    else if (previous === 'dormant' || previous === 'cold') this.dormantCount = Math.max(0, this.dormantCount - 1);
+    this.writeState(element, state);
+    if (state === 'active') this.activeCount += 1;
+    else this.dormantCount += 1;
+  }
+
+  private writeState(element: HTMLElement, state: OptimizerState): void {
+    if (!element.hasAttribute(OPTIMIZER_TURN_ATTRIBUTE)) {
+      element.setAttribute(OPTIMIZER_TURN_ATTRIBUTE, 'true');
+    }
+    if (element.dataset.cgptOptimizerState !== state) {
+      element.setAttribute(OPTIMIZER_STATE_ATTRIBUTE, state);
+    }
+
+    if (state === 'cold') {
+      if (!element.style.getPropertyValue('--cgpt-frozen-height')) {
+        const measured = this.measuredHeights.get(element) ?? element.getBoundingClientRect().height;
+        const height = Number.isFinite(measured) && measured > 0 ? measured : FALLBACK_FROZEN_HEIGHT;
+        element.style.setProperty('--cgpt-frozen-height', `${Math.ceil(height)}px`);
+      }
+    } else if (element.style.getPropertyValue('--cgpt-frozen-height')) {
+      element.style.removeProperty('--cgpt-frozen-height');
     }
   }
 
-  private findTopVisibleTurn(): HTMLElement | null {
-    const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
-    const turns = this.registry.ordered();
-    const scrollContainer = turns[0] ? findScrollableAncestor(turns[0].element) : null;
-    const scrollport = scrollContainer?.getBoundingClientRect();
-    const viewportTop = Math.max(0, scrollport?.top ?? 0);
-    const viewportBottom = Math.min(viewportHeight, scrollport?.bottom ?? viewportHeight);
-    const visible = turns.filter((info) => {
-      const rect = info.element.getBoundingClientRect();
-      return rect.bottom > viewportTop && rect.top < viewportBottom;
-    });
-    return visible[0]?.element ?? this.registry.getByIndex(this.viewport.firstVisible)?.element ?? null;
+  private clearManagedAttributes(): void {
+    this.root?.removeAttribute(OPTIMIZER_ROOT_ATTRIBUTE);
+    this.clearTurnAttributes(this.registry.elements());
+    if (this.root) {
+      for (const markdown of this.root.querySelectorAll<HTMLElement>(`[${LONG_MARKDOWN_ATTRIBUTE}]`)) {
+        markdown.removeAttribute(LONG_MARKDOWN_ATTRIBUTE);
+      }
+    }
+    this.appliedRanges = [];
+    this.initializedCount = 0;
+    this.activeCount = 0;
+    this.dormantCount = 0;
+  }
+
+  private clearTurnAttributes(turns: readonly HTMLElement[]): void {
+    for (const element of turns) {
+      element.removeAttribute(OPTIMIZER_TURN_ATTRIBUTE);
+      element.removeAttribute(OPTIMIZER_STATE_ATTRIBUTE);
+      element.style.removeProperty('--cgpt-frozen-height');
+    }
   }
 }
