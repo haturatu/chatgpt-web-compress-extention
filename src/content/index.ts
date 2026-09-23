@@ -1,4 +1,5 @@
 import { loadConfig, normalizeConfig } from '../shared/config';
+import { t } from '../shared/i18n';
 import { logger } from '../shared/logger';
 import type { ArchiveSnapshot, ArchivedMedia, ArchivedTurn, ContentRequest, ContentResponse, OptimizerConfig, OptimizerStats } from '../shared/types';
 import {
@@ -281,10 +282,10 @@ class ContentController {
     const url = new URL(location.href);
     const conversationId = url.pathname.match(/\/c\/([^/]+)/)?.[1];
     if (!conversationId || !this.currentRoot?.isConnected) {
-      throw new Error('Open a loaded ChatGPT conversation before archiving it.');
+      throw new Error(t('errorOpenConversationBeforeArchive'));
     }
     if (document.querySelector('[data-testid="stop-button"], button[aria-label*="Stop" i], [data-is-streaming="true"]')) {
-      throw new Error('Wait for the current response to finish before archiving.');
+      throw new Error(t('errorWaitForResponse'));
     }
     const composer = document.querySelector<HTMLElement>(
       '#prompt-textarea, [data-testid="prompt-textarea"], [contenteditable="true"]'
@@ -294,10 +295,10 @@ class ContentController {
       : composer?.textContent;
     if (draft?.trim() || composer?.querySelector(
       '[data-testid*="attachment"], [data-testid*="upload"], button[aria-label*="remove attachment" i]'
-    )) throw new Error('Send or clear the draft and attachments before archiving this conversation.');
+    )) throw new Error(t('errorClearDraftAndAttachments'));
 
     const elements = detectTurns(this.currentRoot);
-    if (elements.length === 0) throw new Error('No conversation turns were found on this page.');
+    if (elements.length === 0) throw new Error(t('errorNoTurnsFound'));
     const turns = elements.map((element, index): ArchivedTurn => {
       const message = element.matches('[data-message-author-role]')
         ? element
@@ -319,13 +320,13 @@ class ContentController {
       for (const video of message.querySelectorAll<HTMLVideoElement>('video[src], video source[src]')) {
         const source = video instanceof HTMLSourceElement ? video.src : video.currentSrc || video.src;
         if (source.startsWith('http:') || source.startsWith('https:')) {
-          media.push({ kind: 'video', source, alt: 'Video attachment' });
+          media.push({ kind: 'video', source, alt: '' });
         }
       }
       for (const audio of message.querySelectorAll<HTMLAudioElement>('audio[src], audio source[src]')) {
         const source = audio instanceof HTMLSourceElement ? audio.src : audio.currentSrc || audio.src;
         if (source.startsWith('http:') || source.startsWith('https:')) {
-          media.push({ kind: 'audio', source, alt: 'Audio attachment' });
+          media.push({ kind: 'audio', source, alt: '' });
         }
       }
       const rect = element.getBoundingClientRect();
@@ -340,7 +341,7 @@ class ContentController {
 
     return {
       sourceUrl: url.href,
-      title: document.title || 'ChatGPT conversation',
+      title: document.title || t('chatGPTConversation'),
       conversationId,
       turns
     };

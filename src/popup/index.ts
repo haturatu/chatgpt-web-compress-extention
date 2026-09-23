@@ -1,5 +1,8 @@
 import { loadConfig, saveConfig } from '../shared/config';
+import { localizeDocument, t } from '../shared/i18n';
 import type { ContentRequest, ContentResponse, OptimizerConfig, OptimizerStats } from '../shared/types';
+
+localizeDocument();
 
 const $ = <T extends HTMLElement>(id: string): T => {
   const element = document.getElementById(id);
@@ -34,10 +37,10 @@ function renderConfig(): void {
   ($('enabled') as HTMLInputElement).checked = config.enabled;
   ($('mode') as HTMLSelectElement).value = config.mode;
   $('mode-hint').textContent = config.mode === 'hibernate'
-    ? 'Hides off-window content and remote media. Search and page controls may be affected.'
+    ? t('popupModeHintHibernate')
     : config.mode === 'safe'
-      ? 'Uses CSS containment; the browser tracks turns without scroll-time extension work.'
-      : 'Keeps a moving group of turns active around your viewport.';
+      ? t('popupModeHintSafe')
+      : t('popupModeHintWindow');
   ($('active-window') as HTMLInputElement).value = String(config.activeWindow);
   ($('batch-size') as HTMLInputElement).value = String(config.batchSize);
   ($('auto-load') as HTMLInputElement).checked = config.autoLoad;
@@ -49,13 +52,15 @@ function renderConfig(): void {
 function renderStats(stats: OptimizerStats | undefined): void {
   const active = Boolean(stats?.enabled);
   $('status-dot').dataset.active = String(active);
-  $('thread-status').textContent = !stats?.rootDetected ? 'Not detected' : active ? 'Optimizing' : 'Paused';
+  $('thread-status').textContent = !stats?.rootDetected
+    ? t('threadStateNotDetected')
+    : active ? t('threadStateOptimizing') : t('threadStatePaused');
   $('turns').textContent = stats ? String(stats.turns) : '—';
   $('active').textContent = stats ? String(stats.active) : '—';
   $('dormant').textContent = stats ? String(stats.dormant) : '—';
   $('long-tasks').textContent = stats ? String(stats.longTasks) : '—';
   tabDisabled = Boolean(config.enabled && stats?.rootDetected && !stats.enabled);
-  $('tab-toggle').textContent = tabDisabled ? 'Enable for this tab' : 'Disable for this tab';
+  $('tab-toggle').textContent = tabDisabled ? t('enableForThisTab') : t('disableForThisTab');
 }
 
 async function refreshStats(): Promise<void> {
@@ -76,7 +81,7 @@ async function refreshArchives(): Promise<void> {
   if (!response?.ok || !response.archives?.length) {
     const empty = document.createElement('span');
     empty.className = 'hint';
-    empty.textContent = 'No saved conversations';
+    empty.textContent = t('noSavedConversations');
     list.append(empty);
     return;
   }
@@ -84,15 +89,15 @@ async function refreshArchives(): Promise<void> {
     const row = document.createElement('div');
     row.className = 'archive-entry';
     const label = document.createElement('span');
-    label.textContent = `${archive.title} · ${archive.turnCount} turns`;
+    label.textContent = t('archiveEntry', archive.title, String(archive.turnCount));
     const open = document.createElement('button');
     open.type = 'button';
-    open.textContent = 'Open';
-    open.setAttribute('aria-label', `Open ${archive.title} in Lite Reader`);
+    open.textContent = t('open');
+    open.setAttribute('aria-label', t('openArchiveAria', archive.title));
     open.addEventListener('click', async () => {
-      setMessage('Opening Lite Reader…');
+      setMessage(t('openingLiteReader'));
       const result = await extensionMessage<{ ok: boolean; error?: string }>({ type: 'archive:open', archiveId: archive.id });
-      setMessage(result?.ok ? 'Lite Reader opened' : result?.error ?? 'Could not open this archive.');
+      setMessage(result?.ok ? t('liteReaderOpened') : result?.error ?? t('couldNotOpenArchive'));
     });
     row.append(label, open);
     list.append(row);
@@ -102,18 +107,18 @@ async function refreshArchives(): Promise<void> {
 async function archiveCurrentConversation(): Promise<void> {
   const tabId = await activeTabId();
   if (tabId === undefined) {
-    setMessage('Open a ChatGPT conversation to create an archive.');
+    setMessage(t('openConversationToArchive'));
     return;
   }
   let tab: chrome.tabs.Tab;
   try {
     tab = await chrome.tabs.get(tabId);
   } catch {
-    setMessage('The active tab could not be read.');
+    setMessage(t('activeTabCouldNotRead'));
     return;
   }
   if (!tab.url?.startsWith('https://chatgpt.com/c/') && !tab.url?.startsWith('https://chat.openai.com/c/')) {
-    setMessage('Open a ChatGPT conversation to create an archive.');
+    setMessage(t('openConversationToArchive'));
     return;
   }
   pendingArchiveTarget = { tabId, url: tab.url };
@@ -127,42 +132,42 @@ async function createArchiveAndDiscard(): Promise<void> {
   pendingArchiveTarget = null;
   const button = $('archive-current') as HTMLButtonElement;
   button.disabled = true;
-  button.textContent = 'Saving compressed archive…';
-  setMessage('Reading currently rendered turns…');
+  button.textContent = t('savingCompressedArchive');
+  setMessage(t('readingRenderedTurns'));
   try {
     const captured = await chrome.tabs.sendMessage(target.tabId, { type: 'create-archive-snapshot' }) as ContentResponse;
-    if (!captured?.ok || !captured.snapshot) throw new Error(captured?.error ?? 'Could not read this conversation.');
+    if (!captured?.ok || !captured.snapshot) throw new Error(captured?.error ?? t('couldNotReadConversation'));
     const saved = await extensionMessage<{ ok: boolean; manifest?: { id: string; turnCount: number }; error?: string }>({
       type: 'archive:create-dom',
       snapshot: captured.snapshot,
       sourceTabId: target.tabId,
       sourceUrl: target.url
     });
-    if (!saved?.ok || !saved.manifest?.id) throw new Error(saved?.error ?? 'Could not save the compressed archive.');
-    setMessage('Archive saved. Opening the Lite Reader…');
+    if (!saved?.ok || !saved.manifest?.id) throw new Error(saved?.error ?? t('couldNotSaveCompressedArchive'));
+    setMessage(t('archiveSavedOpeningReader'));
     const handoff = await extensionMessage<{ ok: boolean; discarded?: boolean; error?: string }>({
       type: 'archive:open-and-discard',
       archiveId: saved.manifest.id,
       sourceTabId: target.tabId,
       sourceUrl: target.url
     });
-    if (!handoff?.ok) throw new Error(handoff?.error ?? 'The archive was saved, but the Reader could not open.');
+    if (!handoff?.ok) throw new Error(handoff?.error ?? t('readerCouldNotOpenAfterSave'));
     setMessage(handoff.discarded
-      ? `Lite Reader opened with ${saved.manifest.turnCount} turns; the original tab was discarded.`
-      : `Lite Reader opened with ${saved.manifest.turnCount} turns; the original tab is still active in memory.`);
+      ? t('readerOpenedDiscarded', String(saved.manifest.turnCount))
+      : t('readerOpenedStillActive', String(saved.manifest.turnCount)));
     await refreshArchives();
   } catch (error) {
-    setMessage(error instanceof Error ? error.message : 'The archive could not be created.');
+    setMessage(error instanceof Error ? error.message : t('archiveCouldNotBeCreated'));
   } finally {
     button.disabled = false;
-    button.textContent = 'Archive visible turns & free memory…';
+    button.textContent = t('archiveButton');
   }
 }
 
 async function updateConfig(partial: Partial<OptimizerConfig>): Promise<void> {
   config = await saveConfig({ ...config, ...partial });
   renderConfig();
-  setMessage('Saved');
+  setMessage(t('saved'));
   await refreshStats();
 }
 
@@ -193,11 +198,11 @@ async function init(): Promise<void> {
   $('tab-toggle').addEventListener('click', async () => {
     const response = await sendToTab({ type: tabDisabled ? 'enable-for-tab' : 'disable-for-tab' });
     if (!response) {
-      setMessage('Open a ChatGPT tab to control this setting.');
+      setMessage(t('openChatGPTTabToControl'));
       return;
     }
     renderStats(response.stats);
-    setMessage(tabDisabled ? 'Enabled for this tab' : 'Disabled for this tab');
+    setMessage(tabDisabled ? t('enabledForTab') : t('disabledForTab'));
   });
   $('open-options').addEventListener('click', () => {
     void chrome.runtime.openOptionsPage();
@@ -206,4 +211,4 @@ async function init(): Promise<void> {
   await refreshArchives();
 }
 
-void init().catch(() => setMessage('Something went wrong—reload the popup and try again.'));
+void init().catch(() => setMessage(t('popupReloadError')));

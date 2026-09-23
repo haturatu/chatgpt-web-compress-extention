@@ -1,4 +1,5 @@
 import type { OptimizerStats } from '../shared/types';
+import { t } from '../shared/i18n';
 
 const HOST_ID = 'cgpt-optimizer-status-host';
 
@@ -14,7 +15,7 @@ export class StatusSurface {
 
     if (!this.host || !this.content || !this.host.isConnected) this.create();
     if (!this.content) return;
-    this.content.textContent = `${stats.active}/${stats.turns} active · ${stats.longTasks} long tasks`;
+    this.content.textContent = t('statusOverlayText', String(stats.active), String(stats.turns), String(stats.longTasks));
   }
 
   destroy(): void {
@@ -28,7 +29,7 @@ export class StatusSurface {
     const host = document.createElement('div');
     host.id = HOST_ID;
     host.setAttribute('aria-live', 'polite');
-    host.setAttribute('aria-label', 'ChatGPT Optimizer status');
+    host.setAttribute('aria-label', t('statusOverlayLabel'));
     const shadow = host.attachShadow({ mode: 'closed' });
     const content = document.createElement('div');
     const style = document.createElement('style');

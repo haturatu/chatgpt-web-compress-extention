@@ -1,4 +1,5 @@
 import { loadConfig } from '../shared/config';
+import { t } from '../shared/i18n';
 import type { ArchiveSnapshot, NetworkDiscoveryRecord } from '../shared/types';
 
 const BRIDGE_SOURCE = 'thread-optimizer-extension-bridge';
@@ -36,10 +37,10 @@ window.addEventListener('message', (event: MessageEvent<MainWorldMessage>) => {
   if (message.type !== 'hard-memory-archive' || !message.requestId || !message.snapshot) return;
   void loadConfig().then(async (config) => {
     if (!config.hardMemoryEnabled || !message.snapshot || message.snapshot.sourceUrl !== location.href) {
-      throw new Error('Hard Memory is disabled or the conversation changed.');
+      throw new Error(t('errorHardMemoryDisabled'));
     }
     const response = await chrome.runtime.sendMessage({ type: 'archive:create-hard', snapshot: message.snapshot });
-    if (!response?.ok || !response.manifest?.id) throw new Error(response?.error ?? 'The archive could not be saved.');
+    if (!response?.ok || !response.manifest?.id) throw new Error(response?.error ?? t('couldNotSaveCompressedArchive'));
     window.postMessage({
       source: BRIDGE_SOURCE,
       type: 'hard-memory-archive-ack',

@@ -2,6 +2,8 @@
 
 Manifest V3 Chrome extension for long `chatgpt.com` and `chat.openai.com` conversations.
 
+The extension UI follows Chrome's language setting through the built-in `chrome.i18n` API. Japanese browser locales use the Japanese catalog; other locales fall back to English. The localized popup, settings page, Lite Reader, page status, extension name, and description are packaged under `_locales/` and require no extra permission or network request.
+
 Safe mode is CSS-native: a marker on the conversation root lets `content-visibility: auto` apply to current and future turns without a per-turn registry or scroll, resize, or intersection observer. A temporary discovery observer waits for the conversation root, then the child-list observer marks long Markdown replies once they reach 24 direct children and detects root or URL replacement. Marked replies receive smaller rendering boundaries without a live `:has()` selector. Balanced and Aggressive modes use a moving active window and update only turns crossing its boundaries. Tail appends update the registry in constant time and initialize only the new turns.
 
 Hibernate is an opt-in experiment. It records a turn's measured height, hides its direct children from rendering with `display: none`, and pauses remote HTTP(S) images/audio/video while the turn is cold. The media URLs are restored when the turn becomes active; `blob:` and `data:` sources are left alone. Search, accessibility, citations, and ChatGPT controls may behave differently in this mode. Earlier builds called it Memory Saver; that setting migrates to Hibernate.

@@ -1,64 +1,64 @@
 <!doctype html>
-<html lang="en">
+<html lang="__MSG_documentLanguage__">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#101010" />
     <meta name="color-scheme" content="dark" />
-    <title>ChatGPT Long Thread Optimizer settings</title>
+    <title>__MSG_optionsTitle__</title>
     <link rel="stylesheet" href="options.css" />
   </head>
   <body>
     <main class="page-shell">
       <header class="page-header">
-        <p class="eyebrow">CHATGPT / EXTENSION SETTINGS</p>
-        <h1>Thread optimizer</h1>
-        <p class="lede">Keep long conversations responsive while leaving React-owned DOM nodes in place.</p>
+        <p class="eyebrow">__MSG_settingsEyebrow__</p>
+        <h1>__MSG_threadOptimizer__</h1>
+        <p class="lede">__MSG_settingsLede__</p>
       </header>
 
       <form id="settings-form">
         <section class="panel" aria-labelledby="behavior-heading">
-          <div class="panel-heading"><div><p class="eyebrow">BEHAVIOR</p><h2 id="behavior-heading">Choose how much rendering work to skip</h2></div></div>
+          <div class="panel-heading"><div><p class="eyebrow">__MSG_behavior__</p><h2 id="behavior-heading">__MSG_skipRenderingHeading__</h2></div></div>
           <label class="switch-row" for="enabled">
-            <span><span class="label">Enabled</span><span class="hint">Apply optimization on supported ChatGPT conversations</span></span>
+            <span><span class="label">__MSG_enabled__</span><span class="hint">__MSG_applyOnSupportedConversations__</span></span>
             <input id="enabled" name="enabled" type="checkbox" role="switch" />
           </label>
-          <label class="field" for="mode"><span class="label">Mode</span><span id="mode-hint" class="hint"></span>
-            <select id="mode" name="mode"><option value="safe">Safe · CSS-native</option><option value="balanced">Balanced · window mode</option><option value="aggressive">Aggressive · tighter window</option><option value="hibernate">Hibernate · experimental</option></select>
+          <label class="field" for="mode"><span class="label">__MSG_mode__</span><span id="mode-hint" class="hint"></span>
+            <select id="mode" name="mode"><option value="safe">__MSG_modeSafe__</option><option value="balanced">__MSG_modeBalanced__</option><option value="aggressive">__MSG_modeAggressive__</option><option value="hibernate">__MSG_modeHibernate__</option></select>
           </label>
           <div class="two-col">
-            <label class="field" for="active-window"><span class="label">Active window</span><span class="hint">Turns kept ready around the viewport</span><input id="active-window" name="activeWindow" type="number" min="20" max="240" step="5" required /></label>
-            <label class="field" for="batch-size"><span class="label">Load batch</span><span class="hint">Turns restored on upward scroll</span><input id="batch-size" name="batchSize" type="number" min="5" max="100" step="5" required /></label>
+            <label class="field" for="active-window"><span class="label">__MSG_activeWindow__</span><span class="hint">__MSG_activeWindowHint__</span><input id="active-window" name="activeWindow" type="number" min="20" max="240" step="5" required /></label>
+            <label class="field" for="batch-size"><span class="label">__MSG_loadBatch__</span><span class="hint">__MSG_batchSizeHint__</span><input id="batch-size" name="batchSize" type="number" min="5" max="100" step="5" required /></label>
           </div>
           <div class="two-col">
-            <label class="field" for="pinned-tail"><span class="label">Pinned latest turns</span><span class="hint">Always keep the newest turns active</span><input id="pinned-tail" name="pinnedTail" type="number" min="5" max="50" step="1" required /></label>
-            <label class="field" for="preload-margin"><span class="label">Preload margin</span><span class="hint">Pixels before a dormant boundary loads</span><input id="preload-margin" name="preloadMargin" type="number" min="200" max="2000" step="100" required /></label>
+            <label class="field" for="pinned-tail"><span class="label">__MSG_pinnedLatestTurns__</span><span class="hint">__MSG_pinnedLatestTurnsHint__</span><input id="pinned-tail" name="pinnedTail" type="number" min="5" max="50" step="1" required /></label>
+            <label class="field" for="preload-margin"><span class="label">__MSG_preloadMargin__</span><span class="hint">__MSG_preloadMarginHint__</span><input id="preload-margin" name="preloadMargin" type="number" min="200" max="2000" step="100" required /></label>
           </div>
-          <label class="check-row" for="auto-load"><span><span class="label">Auto load older turns</span><span class="hint">Use one guarded batch per upward scroll</span></span><input id="auto-load" name="autoLoad" type="checkbox" /></label>
-          <label class="check-row" for="show-stats"><span><span class="label">Show page stats</span><span class="hint">Show an unobtrusive active/total status on ChatGPT</span></span><input id="show-stats" name="showStats" type="checkbox" /></label>
+          <label class="check-row" for="auto-load"><span><span class="label">__MSG_autoLoadOlderTurns__</span><span class="hint">__MSG_autoLoadOlderTurnsHint__</span></span><input id="auto-load" name="autoLoad" type="checkbox" /></label>
+          <label class="check-row" for="show-stats"><span><span class="label">__MSG_showPageStats__</span><span class="hint">__MSG_showPageStatsHint__</span></span><input id="show-stats" name="showStats" type="checkbox" /></label>
         </section>
 
         <section class="panel" aria-labelledby="memory-heading">
-          <div class="panel-heading"><p class="eyebrow">EXPERIMENTAL</p><h2 id="memory-heading">Archive & hard memory saver</h2></div>
-          <label class="check-row" for="network-discovery"><span><span class="label">Network discovery</span><span class="hint">Record same-origin fetch paths, response types, and sizes. Request and response bodies are not saved.</span></span><input id="network-discovery" name="networkDiscoveryEnabled" type="checkbox" /></label>
-          <label class="field" for="hard-memory-path"><span class="label">Conversation response</span><span class="hint">Select the JSON response seen in Network discovery. The path is stored without query strings or conversation IDs.</span>
-            <select id="hard-memory-path" name="hardMemoryPayloadPath"><option value="">No response selected</option></select>
+          <div class="panel-heading"><p class="eyebrow">__MSG_experimental__</p><h2 id="memory-heading">__MSG_archiveAndHardMemorySaver__</h2></div>
+          <label class="check-row" for="network-discovery"><span><span class="label">__MSG_networkDiscovery__</span><span class="hint">__MSG_networkDiscoveryHint__</span></span><input id="network-discovery" name="networkDiscoveryEnabled" type="checkbox" /></label>
+          <label class="field" for="hard-memory-path"><span class="label">__MSG_conversationResponse__</span><span class="hint">__MSG_conversationResponseHint__</span>
+            <select id="hard-memory-path" name="hardMemoryPayloadPath"><option value="">__MSG_noResponseSelected__</option></select>
           </label>
           <div class="two-col">
-            <label class="field" for="hard-memory-turns"><span class="label">Recent turns kept in ChatGPT</span><span class="hint">Older messages go to the compressed Lite Reader archive.</span><input id="hard-memory-turns" name="hardMemoryRetainedTurns" type="number" min="20" max="240" step="10" required /></label>
-            <div class="field field-action"><span class="label">Discovery data</span><span id="discovery-count" class="hint">No responses recorded</span><button id="clear-discovery" class="text-button" type="button">Clear discovery data</button></div>
+            <label class="field" for="hard-memory-turns"><span class="label">__MSG_recentTurnsKept__</span><span class="hint">__MSG_olderMessagesArchived__</span><input id="hard-memory-turns" name="hardMemoryRetainedTurns" type="number" min="20" max="240" step="10" required /></label>
+            <div class="field field-action"><span class="label">__MSG_discoveryData__</span><span id="discovery-count" class="hint">__MSG_noResponsesRecorded__</span><button id="clear-discovery" class="text-button" type="button">__MSG_clearDiscoveryData__</button></div>
           </div>
-          <label class="check-row" for="hard-memory"><span><span class="label">Hard Memory Saver</span><span class="hint">After a full local archive is saved, keep only the latest messages in the detected response. Unknown formats pass through unchanged.</span></span><input id="hard-memory" name="hardMemoryEnabled" type="checkbox" /></label>
-          <p class="hint reload-note">Save settings, then reload the ChatGPT tab to install or remove the document-start hook. This experiment may affect branch history and conversation controls.</p>
+          <label class="check-row" for="hard-memory"><span><span class="label">__MSG_hardMemorySaver__</span><span class="hint">__MSG_hardMemorySaverHint__</span></span><input id="hard-memory" name="hardMemoryEnabled" type="checkbox" /></label>
+          <p class="hint reload-note">__MSG_reloadNote__</p>
         </section>
 
         <section class="panel note-panel" aria-labelledby="compatibility-heading">
-          <p class="eyebrow">COMPATIBILITY</p>
-          <h2 id="compatibility-heading">Safe by default</h2>
-          <p>Safe, Balanced, and Aggressive keep conversation nodes attached and do not use <code>display: none</code>. Hibernate hides off-window turn children, preserves measured height, and pauses restorable remote media. Hard Memory Saver is a separate opt-in experiment that archives a recognized response before trimming it. Unknown formats pass through untouched. If a turn or ChatGPT control behaves incorrectly, disable the experiment and reload the page.</p>
+          <p class="eyebrow">__MSG_compatibility__</p>
+          <h2 id="compatibility-heading">__MSG_safeByDefault__</h2>
+          <p>__MSG_compatibilityText__</p>
         </section>
 
-        <div class="actions"><button type="submit" class="primary-button">Save settings</button><span id="message" class="message" role="status" aria-live="polite"></span></div>
+        <div class="actions"><button type="submit" class="primary-button">__MSG_saveSettings__</button><span id="message" class="message" role="status" aria-live="polite"></span></div>
       </form>
     </main>
     <script src="options.js"></script>
