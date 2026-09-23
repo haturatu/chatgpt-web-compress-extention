@@ -1,34 +1,34 @@
 <!doctype html>
-<html lang="en">
+<html lang="__MSG_documentLanguage__">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#101010" />
     <meta name="color-scheme" content="dark" />
-    <title>Lite Reader · ChatGPT archive</title>
+    <title>__MSG_readerTitle__</title>
     <link rel="stylesheet" href="reader.css" />
   </head>
   <body>
-    <a class="skip-link" href="#conversation-scroll">Skip to conversation</a>
+    <a class="skip-link" href="#conversation-scroll">__MSG_skipToConversation__</a>
     <header class="reader-header">
       <div class="title-group">
-        <p class="eyebrow">LOCAL CHATGPT ARCHIVE</p>
+        <p class="eyebrow">__MSG_localChatGPTArchive__</p>
         <h1 id="archive-title">Lite Reader</h1>
-        <p id="archive-detail" class="muted">Loading archive…</p>
+        <p id="archive-detail" class="muted">__MSG_loadingArchive__</p>
       </div>
-      <nav class="actions" aria-label="Archive actions">
-        <button id="resume" class="secondary-button" type="button">Return to ChatGPT</button>
-        <button id="delete" class="danger-button" type="button">Delete archive…</button>
+      <nav class="actions" aria-label="__MSG_archiveActions__">
+        <button id="resume" class="secondary-button" type="button">__MSG_returnToChatGPT__</button>
+        <button id="delete" class="danger-button" type="button">__MSG_deleteArchive__</button>
       </nav>
     </header>
     <main id="archive-main">
       <form id="search-form" class="search-row">
-        <label for="archive-search">Find in archive</label>
-        <input id="archive-search" name="q" type="search" autocomplete="off" placeholder="Search messages…" />
-        <button class="secondary-button" type="submit">Find</button>
+        <label for="archive-search">__MSG_findInArchive__</label>
+        <input id="archive-search" name="q" type="search" autocomplete="off" placeholder="__MSG_searchMessages__" />
+        <button class="secondary-button" type="submit">__MSG_find__</button>
       </form>
-      <p id="reader-status" class="status" role="status" aria-live="polite">Loading archive…</p>
-      <section id="conversation-scroll" class="conversation-scroll" tabindex="0" aria-label="Archived conversation">
+      <p id="reader-status" class="status" role="status" aria-live="polite">__MSG_loadingArchive__</p>
+      <section id="conversation-scroll" class="conversation-scroll" tabindex="0" aria-label="__MSG_archivedConversation__">
         <div id="top-spacer" aria-hidden="true"></div>
         <div id="turn-window"></div>
         <div id="bottom-spacer" aria-hidden="true"></div>
@@ -36,11 +36,11 @@
     </main>
     <dialog id="delete-confirm" aria-labelledby="delete-title">
       <form method="dialog">
-        <h2 id="delete-title">Delete this local archive?</h2>
-        <p>The compressed copy will be removed. Your ChatGPT conversation remains available in its original tab.</p>
+        <h2 id="delete-title">__MSG_deleteArchiveConfirmTitle__</h2>
+        <p>__MSG_deleteArchiveConfirmBody__</p>
         <div class="dialog-actions">
-          <button class="secondary-button" value="cancel">Cancel</button>
-          <button id="confirm-delete" class="danger-button" value="delete">Delete archive</button>
+          <button class="secondary-button" value="cancel">__MSG_cancel__</button>
+          <button id="confirm-delete" class="danger-button" value="delete">__MSG_deleteArchiveButton__</button>
         </div>
       </form>
     </dialog>

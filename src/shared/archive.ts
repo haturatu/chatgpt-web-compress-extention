@@ -1,4 +1,5 @@
 import type { ArchiveChunkDescriptor, ArchiveManifest, ArchiveSnapshot, ArchivedTurn } from './types';
+import { t } from './i18n';
 
 const DATABASE_NAME = 'chatgpt-thread-archives';
 const DATABASE_VERSION = 1;
@@ -25,7 +26,7 @@ function openDatabase(): Promise<IDBDatabase> {
       }
     };
     request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error ?? new Error('Could not open local archive storage.'));
+    request.onerror = () => reject(request.error ?? new Error(t('errorStorageOpen')));
   });
 }
 
@@ -35,8 +36,8 @@ async function putManifest(manifest: ArchiveManifest): Promise<void> {
     const transaction = database.transaction(MANIFEST_STORE, 'readwrite');
     transaction.objectStore(MANIFEST_STORE).put(manifest);
     transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error ?? new Error('Could not save archive details.'));
-    transaction.onabort = () => reject(transaction.error ?? new Error('Archive details save was aborted.'));
+    transaction.onerror = () => reject(transaction.error ?? new Error(t('errorSaveArchiveDetails')));
+    transaction.onabort = () => reject(transaction.error ?? new Error(t('errorArchiveDetailsAborted')));
   });
   database.close();
 }
@@ -47,8 +48,8 @@ async function putChunk(key: string, bytes: ArrayBuffer): Promise<void> {
     const transaction = database.transaction(CHUNK_STORE, 'readwrite');
     transaction.objectStore(CHUNK_STORE).put({ key, bytes } satisfies StoredChunk);
     transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error ?? new Error('Could not save an archive section.'));
-    transaction.onabort = () => reject(transaction.error ?? new Error('Archive section save was aborted.'));
+    transaction.onerror = () => reject(transaction.error ?? new Error(t('errorSaveArchiveSection')));
+    transaction.onabort = () => reject(transaction.error ?? new Error(t('errorArchiveSectionAborted')));
   });
   database.close();
 }
@@ -59,7 +60,7 @@ async function getChunk(key: string): Promise<ArrayBuffer | undefined> {
     const transaction = database.transaction(CHUNK_STORE, 'readonly');
     const request = transaction.objectStore(CHUNK_STORE).get(key) as IDBRequest<StoredChunk | undefined>;
     request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error ?? new Error('Could not read an archive section.'));
+    request.onerror = () => reject(request.error ?? new Error(t('errorReadArchiveSection')));
   });
   database.close();
   return result?.bytes;
@@ -78,7 +79,7 @@ async function deleteChunkRecords(archiveId: string): Promise<void> {
       cursor.continue();
     };
     transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error ?? new Error('Could not delete archive data.'));
+    transaction.onerror = () => reject(transaction.error ?? new Error(t('errorDeleteArchiveData')));
   });
   database.close();
 }
@@ -88,7 +89,7 @@ function getOpfsDirectory(): Promise<FileSystemDirectoryHandle> {
     getDirectory?: () => Promise<FileSystemDirectoryHandle>;
   };
   if (typeof storage.getDirectory !== 'function') {
-    return Promise.reject(new Error('Origin-private file storage is unavailable.'));
+    return Promise.reject(new Error(t('errorOpfsUnavailable')));
   }
   return storage.getDirectory();
 }
@@ -136,8 +137,8 @@ export async function saveArchive(
   sourceTabId: number | null,
   kind: ArchiveManifest['kind'] = 'dom-snapshot'
 ): Promise<ArchiveManifest> {
-  if (!snapshot.turns.length) throw new Error('This conversation does not contain any turns to save.');
-  if (snapshot.turns.length > 20_000) throw new Error('This archive is too large to save in one operation.');
+  if (!snapshot.turns.length) throw new Error(t('errorNoTurnsToSave'));
+  if (snapshot.turns.length > 20_000) throw new Error(t('errorArchiveTooLarge'));
 
   const id = crypto.randomUUID();
   const chunks: ArchiveChunkDescriptor[] = [];
@@ -172,7 +173,7 @@ export async function readArchiveManifest(id: string): Promise<ArchiveManifest |
     const transaction = database.transaction(MANIFEST_STORE, 'readonly');
     const request = transaction.objectStore(MANIFEST_STORE).get(id) as IDBRequest<ArchiveManifest | undefined>;
     request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error ?? new Error('Could not read the archive.'));
+    request.onerror = () => reject(request.error ?? new Error(t('errorReadArchive')));
   });
   database.close();
   return manifest;
@@ -180,7 +181,7 @@ export async function readArchiveManifest(id: string): Promise<ArchiveManifest |
 
 export async function updateArchiveSourceTabId(id: string, sourceTabId: number): Promise<void> {
   const manifest = await readArchiveManifest(id);
-  if (!manifest) throw new Error('This archive is no longer available.');
+  if (!manifest) throw new Error(t('errorArchiveUnavailable'));
   manifest.sourceTabId = sourceTabId;
   await putManifest(manifest);
 }
@@ -191,7 +192,7 @@ export async function listArchives(): Promise<ArchiveManifest[]> {
     const transaction = database.transaction(MANIFEST_STORE, 'readonly');
     const request = transaction.objectStore(MANIFEST_STORE).getAll() as IDBRequest<ArchiveManifest[]>;
     request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error ?? new Error('Could not list saved archives.'));
+    request.onerror = () => reject(request.error ?? new Error(t('errorListArchives')));
   });
   database.close();
   return manifests.sort((left, right) => right.createdAt - left.createdAt);
@@ -199,24 +200,24 @@ export async function listArchives(): Promise<ArchiveManifest[]> {
 
 export async function readArchiveChunk(manifest: ArchiveManifest, index: number): Promise<ArchivedTurn[]> {
   const descriptor = manifest.chunks[index];
-  if (!descriptor) throw new Error('The requested archive section does not exist.');
+  if (!descriptor) throw new Error(t('errorSectionMissing'));
   let compressed: Blob | ArrayBuffer;
   if (descriptor.storage === 'opfs' && descriptor.fileName) {
     const root = await getOpfsDirectory();
     const archives = await root.getDirectoryHandle(OPFS_DIRECTORY);
     const [archiveId, fileName] = descriptor.fileName.split('/');
-    if (!archiveId || !fileName) throw new Error('The archive section path is invalid.');
+    if (!archiveId || !fileName) throw new Error(t('errorSectionPathInvalid'));
     const folder = await archives.getDirectoryHandle(archiveId);
     compressed = await (await folder.getFileHandle(fileName)).getFile();
   } else {
     const bytes = await getChunk(`${manifest.id}:${index}`);
-    if (!bytes) throw new Error('The saved archive section is missing.');
+    if (!bytes) throw new Error(t('errorSavedSectionMissing'));
     compressed = bytes;
   }
   const stream = compressed instanceof Blob ? compressed.stream() : new Blob([compressed]).stream();
   const json = await new Response(stream.pipeThrough(new DecompressionStream('gzip'))).text();
   const turns = JSON.parse(json) as ArchivedTurn[];
-  if (!Array.isArray(turns)) throw new Error('The saved archive section has an invalid format.');
+  if (!Array.isArray(turns)) throw new Error(t('errorSavedSectionInvalid'));
   return turns;
 }
 
@@ -239,7 +240,7 @@ export async function deleteArchive(id: string): Promise<void> {
     const transaction = database.transaction(MANIFEST_STORE, 'readwrite');
     transaction.objectStore(MANIFEST_STORE).delete(id);
     transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error ?? new Error('Could not delete archive details.'));
+    transaction.onerror = () => reject(transaction.error ?? new Error(t('errorDeleteArchiveDetails')));
   });
   database.close();
 }

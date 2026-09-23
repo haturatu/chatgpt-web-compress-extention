@@ -1,4 +1,5 @@
 import { readArchiveChunk, readArchiveManifest } from '../shared/archive';
+import { t, uiLocale } from '../shared/i18n';
 import type { ArchiveManifest, ArchivedMedia, ArchivedTurn } from '../shared/types';
 
 const WINDOW_SIZE = 40;
@@ -7,7 +8,7 @@ const CACHE_LIMIT = 4;
 
 const $ = <T extends HTMLElement>(id: string): T => {
   const element = document.getElementById(id);
-  if (!element) throw new Error(`Missing Lite Reader element: ${id}`);
+  if (!element) throw new Error(t('readerInterfaceMissing', id));
   return element as T;
 };
 
@@ -88,7 +89,7 @@ async function getChunk(index: number): Promise<ArchivedTurn[]> {
     chunkCache.set(index, cached);
     return cached;
   }
-  if (!manifest) throw new Error('No archive is open.');
+  if (!manifest) throw new Error(t('noArchiveOpen'));
   const chunk = await readArchiveChunk(manifest, index);
   chunkCache.set(index, chunk);
   while (chunkCache.size > CACHE_LIMIT) chunkCache.delete(chunkCache.keys().next().value as number);
@@ -99,15 +100,16 @@ function renderMedia(container: HTMLElement, media: ArchivedMedia): void {
   const card = document.createElement('div');
   card.className = 'media-placeholder';
   const label = document.createElement('span');
-  label.textContent = media.alt || `${media.kind} attachment`;
+  const mediaKind = media.kind === 'image' ? t('image') : media.kind === 'video' ? t('video') : t('audio');
+  label.textContent = media.alt || t('mediaAttachment', mediaKind);
   const load = document.createElement('button');
   load.type = 'button';
-  load.textContent = media.kind === 'image' ? 'Load image' : `Open ${media.kind}`;
-  load.setAttribute('aria-label', `${load.textContent}: ${media.alt || 'archived attachment'}`);
+  load.textContent = media.kind === 'image' ? t('loadImage') : t('openMedia', mediaKind);
+  load.setAttribute('aria-label', t('mediaActionAria', load.textContent, media.alt || t('archivedAttachment')));
   if (media.kind === 'image') {
     load.addEventListener('click', () => {
       const image = document.createElement('img');
-      image.alt = media.alt || 'Archived image';
+      image.alt = media.alt || t('archivedImage');
       image.loading = 'lazy';
       if (media.width) image.width = media.width;
       if (media.height) image.height = media.height;
@@ -126,7 +128,7 @@ function openSource(media: ArchivedMedia): HTMLAnchorElement {
   link.href = media.source;
   link.target = '_blank';
   link.rel = 'noopener noreferrer';
-  link.textContent = 'Open original media';
+  link.textContent = t('openOriginalMedia');
   return link;
 }
 
@@ -138,9 +140,13 @@ function createTurnCard(turn: ArchivedTurn, index: number): HTMLElement {
   heading.className = 'turn-heading';
   const role = document.createElement('span');
   role.className = 'turn-role';
-  role.textContent = turn.role || 'message';
+  role.textContent = turn.role === 'user'
+    ? t('roleUser')
+    : turn.role === 'assistant'
+      ? t('roleAssistant')
+      : turn.role || t('roleMessage');
   const number = document.createElement('span');
-  number.textContent = `Message ${index + 1}`;
+  number.textContent = t('messageNumber', String(index + 1));
   heading.append(role, number);
   article.append(heading);
   if (turn.text) {
@@ -182,21 +188,21 @@ async function renderWindow(): Promise<void> {
     $('bottom-spacer').style.height = `${Math.max(0, prefixHeights[manifest.turnCount]! - (prefixHeights[end] ?? 0))}px`;
     $('turn-window').replaceChildren(...rendered);
     observeRenderedCards();
-    setStatus(searchStatus ?? `Showing ${start + 1}–${Math.max(start, end)} of ${manifest.turnCount} messages · at most ${WINDOW_SIZE} rendered at once`);
+    setStatus(searchStatus ?? t('readerShowing', String(start + 1), String(Math.max(start, end)), String(manifest.turnCount), String(WINDOW_SIZE)));
   } catch {
-    setStatus('This archive section could not be read. Try another section or return to ChatGPT.');
+    setStatus(t('readerSectionReadError'));
   }
 }
 
 async function findInArchive(query: string): Promise<void> {
   if (!manifest) return;
-  const needle = query.trim().toLocaleLowerCase();
+  const needle = query.trim().toLocaleLowerCase(uiLocale());
   if (!needle) {
     searchStatus = null;
-    setStatus(`Archive contains ${manifest.turnCount} messages.`);
+    setStatus(t('archiveContainsMessages', String(manifest.turnCount)));
     return;
   }
-  searchStatus = 'Searching compressed archive…';
+  searchStatus = t('searchingArchive');
   setStatus(searchStatus);
   const matches: number[] = [];
   try {
@@ -204,32 +210,32 @@ async function findInArchive(query: string): Promise<void> {
       const turns = await readArchiveChunk(manifest, chunkIndex);
       const offset = chunkStarts[chunkIndex] ?? 0;
       turns.forEach((turn, index) => {
-        if (turn.text.toLocaleLowerCase().includes(needle)) matches.push(offset + index);
+        if (turn.text.toLocaleLowerCase(uiLocale()).includes(needle)) matches.push(offset + index);
       });
       if (chunkCache.size > CACHE_LIMIT) chunkCache.delete(chunkCache.keys().next().value as number);
     }
     if (matches.length === 0) {
-      searchStatus = 'No messages matched that search.';
+      searchStatus = t('searchNoMatches');
       setStatus(searchStatus);
       return;
     }
     const target = matches[0]!;
     $('conversation-scroll').scrollTop = prefixHeights[target] ?? 0;
     await renderWindow();
-    searchStatus = `${matches.length} matching messages · showing the first match`;
+    searchStatus = t('searchFirstMatch', String(matches.length));
     setStatus(searchStatus);
   } catch {
-    searchStatus = 'Search could not read the compressed archive.';
+    searchStatus = t('searchReadError');
     setStatus(searchStatus);
   }
 }
 
 async function resumeInChatGPT(): Promise<void> {
   if (!manifest) return;
-  setStatus('Returning to the saved ChatGPT conversation…');
+  setStatus(t('returningToChatGPT'));
   const result = await chrome.runtime.sendMessage({ type: 'archive:resume', archiveId: manifest.id })
     .catch(() => null) as { ok?: boolean; error?: string } | null;
-  setStatus(result?.ok ? 'ChatGPT opened in its original tab.' : result?.error ?? 'Could not reopen ChatGPT.');
+  setStatus(result?.ok ? t('chatGPTOpenedOriginalTab') : result?.error ?? t('couldNotReopenChatGPT'));
 }
 
 async function removeArchive(): Promise<void> {
@@ -237,27 +243,27 @@ async function removeArchive(): Promise<void> {
   const result = await chrome.runtime.sendMessage({ type: 'archive:delete-and-resume', archiveId: manifest.id })
     .catch(() => null) as { ok?: boolean; error?: string } | null;
   if (!result?.ok) {
-    setStatus(result?.error ?? 'The archive could not be deleted.');
+    setStatus(result?.error ?? t('archiveCouldNotBeDeleted'));
     return;
   }
-  setStatus('Archive deleted. Returning to ChatGPT…');
+  setStatus(t('archiveDeletedReturning'));
   window.setTimeout(() => window.close(), 400);
 }
 
 async function init(): Promise<void> {
-  if (!archiveId) throw new Error('The archive identifier is missing.');
+  if (!archiveId) throw new Error(t('missingArchiveIdentifier'));
   manifest = await readArchiveManifest(archiveId) ?? null;
-  if (!manifest) throw new Error('This archive is no longer available.');
-  document.title = `${manifest.title} · Lite Reader`;
+  if (!manifest) throw new Error(t('errorArchiveUnavailable'));
+  document.title = `${manifest.title} · ${t('liteReader')}`;
   $('archive-title').textContent = manifest.title;
-  $('archive-detail').textContent = `${manifest.turnCount} messages · saved ${new Date(manifest.createdAt).toLocaleString()}`;
+  $('archive-detail').textContent = t('messageCountAndSavedAt', String(manifest.turnCount), new Date(manifest.createdAt).toLocaleString(uiLocale()));
   chunkStarts = [];
   let chunkOffset = 0;
   for (const chunk of manifest.chunks) {
     chunkStarts.push(chunkOffset);
     chunkOffset += chunk.count;
   }
-  if (chunkOffset !== manifest.turnCount) throw new Error('The archive index does not match its saved chunks.');
+  if (chunkOffset !== manifest.turnCount) throw new Error(t('archiveIndexMismatch'));
   rebuildPrefixHeights();
   $('conversation-scroll').addEventListener('scroll', () => void renderWindow(), { passive: true });
   $('search-form').addEventListener('submit', (event) => {
@@ -274,4 +280,4 @@ async function init(): Promise<void> {
   await renderWindow();
 }
 
-void init().catch((error: unknown) => setStatus(error instanceof Error ? error.message : 'Could not open this archive.'));
+void init().catch((error: unknown) => setStatus(error instanceof Error ? error.message : t('couldNotOpenThisArchive')));

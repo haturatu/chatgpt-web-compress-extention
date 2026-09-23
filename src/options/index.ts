@@ -1,4 +1,5 @@
 import { loadConfig, saveConfig } from '../shared/config';
+import { t } from '../shared/i18n';
 import type { NetworkDiscoveryRecord, OptimizerConfig } from '../shared/types';
 
 const $ = <T extends HTMLElement>(id: string): T => {
@@ -14,10 +15,10 @@ function render(): void {
   ($('enabled') as HTMLInputElement).checked = config.enabled;
   ($('mode') as HTMLSelectElement).value = config.mode;
   $('mode-hint').textContent = config.mode === 'hibernate'
-    ? 'Hides off-window content and pauses restorable remote media; page search may be affected.'
+    ? t('modeHintHibernate')
     : config.mode === 'safe'
-      ? 'Uses CSS containment; the browser tracks turns without scroll-time extension work.'
-      : 'Keeps a moving group of turns active around your viewport.';
+      ? t('modeHintSafe')
+      : t('modeHintWindow');
   ($('active-window') as HTMLInputElement).value = String(config.activeWindow);
   ($('batch-size') as HTMLInputElement).value = String(config.batchSize);
   ($('pinned-tail') as HTMLInputElement).value = String(config.pinnedTail);
@@ -33,19 +34,21 @@ function render(): void {
 function renderDiscoveryCandidates(): void {
   const select = $('hard-memory-path') as HTMLSelectElement;
   const current = config.hardMemoryPayloadPath;
-  select.replaceChildren(new Option('No response selected', ''));
+  select.replaceChildren(new Option(t('noResponseSelected'), ''));
   const candidates = discoveryRecords.filter((record) => /application\/json|\+json/i.test(record.contentType));
   if (current && !candidates.some((record) => record.path === current)) {
-    select.add(new Option(`${current} · saved selection`, current));
+    select.add(new Option(t('jsonResponsePathSaved', current), current));
   }
   for (const record of candidates) {
-    const size = record.encodedBytes > 0 ? `${Math.round(record.encodedBytes / 1024)} KB` : 'size unknown';
-    select.add(new Option(`${record.method} ${record.path} · ${size} · ${record.observations} seen`, record.path));
+    const size = record.encodedBytes > 0
+      ? t('kilobytes', String(Math.round(record.encodedBytes / 1024)))
+      : t('sizeUnknown');
+    select.add(new Option(t('jsonResponseEntry', record.method, record.path, size, String(record.observations)), record.path));
   }
   select.value = candidates.some((record) => record.path === current) ? current : '';
   $('discovery-count').textContent = candidates.length
-    ? `${candidates.length} JSON response paths recorded`
-    : 'No JSON responses recorded';
+    ? t('responsesRecorded', String(candidates.length))
+    : t('noResponsesRecorded');
 }
 
 async function loadDiscoveryRecords(): Promise<void> {
@@ -81,14 +84,14 @@ async function init(): Promise<void> {
       hardMemoryPayloadPath: ($('hard-memory-path') as HTMLSelectElement).value
     };
     if (next.hardMemoryEnabled && !next.hardMemoryPayloadPath) {
-      $('message').textContent = 'Select a JSON response from Network discovery before enabling Hard Memory.';
+      $('message').textContent = t('selectJsonBeforeHardMemory');
       $('hard-memory-path').focus();
       return;
     }
     config = await saveConfig(next);
     await chrome.runtime.sendMessage({ type: 'hard-memory:sync' }).catch(() => undefined);
     render();
-    $('message').textContent = 'Saved. Reload the ChatGPT tab to apply document-start settings.';
+    $('message').textContent = t('savedReloadToApply');
   });
   $('clear-discovery').addEventListener('click', async () => {
     await chrome.storage.local.remove('networkDiscoveryRecords');
@@ -98,7 +101,7 @@ async function init(): Promise<void> {
       await chrome.runtime.sendMessage({ type: 'hard-memory:sync' }).catch(() => undefined);
     }
     renderDiscoveryCandidates();
-    $('message').textContent = 'Discovery data cleared';
+    $('message').textContent = t('discoveryDataCleared');
   });
   chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName === 'local' && 'networkDiscoveryRecords' in changes) void loadDiscoveryRecords();
@@ -106,4 +109,4 @@ async function init(): Promise<void> {
   await loadDiscoveryRecords();
 }
 
-void init().catch(() => { $('message').textContent = 'Something went wrong—reload this page and try again.'; });
+void init().catch(() => { $('message').textContent = t('optionsReloadError'); });

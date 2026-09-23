@@ -41,6 +41,7 @@ const buildAll = async () => {
   await cp(resolve(root, 'src/options/options.css'), resolve(outDir, 'options.css'));
   await cp(resolve(root, 'src/reader/reader.html'), resolve(outDir, 'reader.html'));
   await cp(resolve(root, 'src/reader/reader.css'), resolve(outDir, 'reader.css'));
+  await cp(resolve(root, '_locales'), resolve(outDir, '_locales'), { recursive: true });
 
   const manifest = JSON.parse(await readFile(resolve(root, 'manifest.json'), 'utf8'));
   await writeFile(resolve(outDir, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
@@ -60,6 +61,7 @@ if (process.argv.includes('--watch')) {
   await cp(resolve(root, 'src/options/options.css'), resolve(outDir, 'options.css'));
   await cp(resolve(root, 'src/reader/reader.html'), resolve(outDir, 'reader.html'));
   await cp(resolve(root, 'src/reader/reader.css'), resolve(outDir, 'reader.css'));
+  await cp(resolve(root, '_locales'), resolve(outDir, '_locales'), { recursive: true });
 } else {
   await buildAll();
 }
