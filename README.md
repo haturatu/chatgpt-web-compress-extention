@@ -36,8 +36,6 @@ npm run build
 
 Load `dist/` from `chrome://extensions` with **Developer mode → Load unpacked**. The content script only runs on the two ChatGPT hostnames in `manifest.json`.
 
-With Chromium started using `--remote-debugging-port=9222`, measure a ChatGPT tab with `node scripts/measure-memory.mjs http://127.0.0.1:9222`. Add a conversation ID as the third argument to select one tab. The script prints CDP JavaScript heap and DOM/listener counters; it does not measure the complete renderer or browser process RSS.
-
 ## Architecture
 
 - `detector.ts` owns resilient selectors, cheap root discovery, and a fail-open path when ChatGPT changes its markup.
