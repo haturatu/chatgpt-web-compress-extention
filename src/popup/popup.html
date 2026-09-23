@@ -1,93 +1,93 @@
 <!doctype html>
-<html lang="en">
+<html lang="__MSG_documentLanguage__">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="dark" />
-    <title>Thread Optimizer</title>
+    <title>__MSG_popupTitle__</title>
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
     <main class="shell">
       <header class="header">
         <div>
-          <p class="eyebrow">CHATGPT</p>
-          <h1>Thread optimizer</h1>
+          <p class="eyebrow">__MSG_chatgpt__</p>
+          <h1>__MSG_threadOptimizer__</h1>
         </div>
-        <span id="status-dot" class="status-dot" aria-label="Status"></span>
+        <span id="status-dot" class="status-dot" aria-label="__MSG_status__"></span>
       </header>
 
       <form id="settings-form" novalidate>
         <label class="switch-row" for="enabled">
           <span>
-            <span class="label">Enabled</span>
-            <span class="hint">Keep long threads responsive</span>
+            <span class="label">__MSG_enabled__</span>
+            <span class="hint">__MSG_keepLongThreadsResponsive__</span>
           </span>
           <input id="enabled" name="enabled" type="checkbox" role="switch" />
         </label>
 
         <label class="field" for="mode">
-          <span class="label">Mode</span>
+          <span class="label">__MSG_mode__</span>
           <select id="mode" name="mode">
-            <option value="safe">Safe · CSS containment</option>
-            <option value="balanced">Balanced · window mode</option>
-            <option value="aggressive">Aggressive · tighter window</option>
-            <option value="hibernate">Hibernate · experimental</option>
+            <option value="safe">__MSG_modeSafe__</option>
+            <option value="balanced">__MSG_modeBalanced__</option>
+            <option value="aggressive">__MSG_modeAggressive__</option>
+            <option value="hibernate">__MSG_modeHibernate__</option>
           </select>
           <span id="mode-hint" class="hint"></span>
         </label>
 
         <div class="range-field">
-          <div class="range-label"><label for="active-window">Active window</label><output id="active-window-value" for="active-window"></output></div>
+          <div class="range-label"><label for="active-window">__MSG_activeWindow__</label><output id="active-window-value" for="active-window"></output></div>
           <input id="active-window" name="activeWindow" type="range" min="20" max="240" step="5" />
-          <p class="hint">Turns kept ready around your viewport</p>
+          <p class="hint">__MSG_turnsKeptReady__</p>
         </div>
 
         <div class="range-field">
-          <div class="range-label"><label for="batch-size">Load batch</label><output id="batch-size-value" for="batch-size"></output></div>
+          <div class="range-label"><label for="batch-size">__MSG_loadBatch__</label><output id="batch-size-value" for="batch-size"></output></div>
           <input id="batch-size" name="batchSize" type="range" min="5" max="100" step="5" />
-          <p class="hint">Turns restored when scrolling upward</p>
+          <p class="hint">__MSG_turnsRestoredOnScroll__</p>
         </div>
 
         <label class="check-row" for="auto-load">
-          <span><span class="label">Auto load</span><span class="hint">Preload before you reach older turns</span></span>
+          <span><span class="label">__MSG_autoLoad__</span><span class="hint">__MSG_preloadBeforeOlderTurns__</span></span>
           <input id="auto-load" name="autoLoad" type="checkbox" />
         </label>
 
         <label class="check-row" for="show-stats">
-          <span><span class="label">Show stats</span><span class="hint">Display a compact page status</span></span>
+          <span><span class="label">__MSG_showStats__</span><span class="hint">__MSG_compactPageStatus__</span></span>
           <input id="show-stats" name="showStats" type="checkbox" />
         </label>
       </form>
 
       <section class="stats-card" aria-labelledby="stats-heading">
-        <div class="section-heading"><h2 id="stats-heading">Current thread</h2><span id="thread-status">Not detected</span></div>
+        <div class="section-heading"><h2 id="stats-heading">__MSG_currentThread__</h2><span id="thread-status">__MSG_notDetected__</span></div>
         <dl class="stats-grid">
-          <div><dt>Turns</dt><dd id="turns">—</dd></div>
-          <div><dt>Active</dt><dd id="active">—</dd></div>
-          <div><dt>Dormant</dt><dd id="dormant">—</dd></div>
-          <div><dt>Long tasks</dt><dd id="long-tasks">—</dd></div>
+          <div><dt>__MSG_turns__</dt><dd id="turns">—</dd></div>
+          <div><dt>__MSG_active__</dt><dd id="active">—</dd></div>
+          <div><dt>__MSG_dormant__</dt><dd id="dormant">—</dd></div>
+          <div><dt>__MSG_longTasks__</dt><dd id="long-tasks">—</dd></div>
         </dl>
       </section>
 
       <section class="archive-card" aria-labelledby="archive-heading">
-        <div class="section-heading"><h2 id="archive-heading">Lite Reader</h2><span>Local archive</span></div>
-        <p class="hint">Save currently rendered turns as compressed text, then discard this tab. ChatGPT may virtualize older turns; check the Reader count.</p>
-        <button id="archive-current" class="primary-button" type="button">Archive visible turns & free memory…</button>
+        <div class="section-heading"><h2 id="archive-heading">__MSG_liteReader__</h2><span>__MSG_localArchive__</span></div>
+        <p class="hint">__MSG_archiveDescription__</p>
+        <button id="archive-current" class="primary-button" type="button">__MSG_archiveButton__</button>
         <div id="archives" class="archives" aria-live="polite"></div>
       </section>
 
-      <button id="tab-toggle" class="secondary-button" type="button">Disable for this tab</button>
+      <button id="tab-toggle" class="secondary-button" type="button">__MSG_disableForThisTab__</button>
       <p id="message" class="message" role="status" aria-live="polite"></p>
-      <button class="settings-link" type="button" id="open-options">Open full settings <span aria-hidden="true">↗</span></button>
+      <button class="settings-link" type="button" id="open-options">__MSG_openFullSettings__ <span aria-hidden="true">↗</span></button>
     </main>
     <dialog id="archive-confirm" class="confirm-dialog" aria-labelledby="archive-confirm-title">
       <form method="dialog">
-        <h2 id="archive-confirm-title">Save visible turns & discard this tab?</h2>
-        <p>Only turns currently rendered by ChatGPT are captured. Older turns may be virtualized, so verify the message count in Lite Reader before relying on this copy. The original tab reloads when you return. A draft or active response prevents archiving.</p>
+        <h2 id="archive-confirm-title">__MSG_confirmArchiveTitle__</h2>
+        <p>__MSG_confirmArchiveDescription__</p>
         <div class="dialog-actions">
-          <button class="secondary-button" value="cancel">Cancel</button>
-          <button id="confirm-archive" class="primary-button" value="confirm">Save visible turns & discard</button>
+          <button class="secondary-button" value="cancel">__MSG_cancel__</button>
+          <button id="confirm-archive" class="primary-button" value="confirm">__MSG_saveVisibleTurnsDiscard__</button>
         </div>
       </form>
     </dialog>

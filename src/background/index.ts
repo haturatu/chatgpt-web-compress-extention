@@ -1,5 +1,6 @@
 import { deleteArchive, listArchives, readArchiveManifest, saveArchive, updateArchiveSourceTabId } from '../shared/archive';
 import { loadConfig } from '../shared/config';
+import { t } from '../shared/i18n';
 import type { ArchiveSnapshot, NetworkDiscoveryRecord } from '../shared/types';
 import { logger } from '../shared/logger';
 
@@ -111,21 +112,21 @@ function recordNetworkMetadata(record: Partial<NetworkDiscoveryRecord>): Promise
 
 async function saveSnapshot(snapshot: ArchiveSnapshot, sourceTabId: number | null, kind: 'dom-snapshot' | 'hard-memory') {
   if (!snapshot || !Array.isArray(snapshot.turns) || !isChatGptUrl(snapshot.sourceUrl)) {
-    throw new Error('The conversation snapshot is invalid.');
+    throw new Error(t('errorInvalidSnapshot'));
   }
   if (snapshot.turns.some((turn) => typeof turn.text !== 'string' || !Array.isArray(turn.media))) {
-    throw new Error('The conversation snapshot contains an unsupported turn.');
+    throw new Error(t('errorUnsupportedTurn'));
   }
   return saveArchive(snapshot, sourceTabId, kind);
 }
 
 async function openReader(archiveId: string): Promise<number> {
-  if (!isArchiveId(archiveId)) throw new Error('The archive identifier is invalid.');
+  if (!isArchiveId(archiveId)) throw new Error(t('errorInvalidArchiveIdentifier'));
   const manifest = await readArchiveManifest(archiveId);
-  if (!manifest) throw new Error('This local archive could not be found.');
+  if (!manifest) throw new Error(t('errorArchiveNotFound'));
   const url = chrome.runtime.getURL(`reader.html?archive=${encodeURIComponent(archiveId)}`);
   const tab = await chrome.tabs.create({ url, active: true });
-  if (tab.id === undefined) throw new Error('The Lite Reader tab could not be opened.');
+  if (tab.id === undefined) throw new Error(t('errorReaderTabCouldNotOpen'));
   return tab.id;
 }
 
@@ -153,19 +154,19 @@ chrome.runtime.onMessage.addListener((request: BackgroundRequest, sender, sendRe
   const run = async (): Promise<unknown> => {
     switch (request?.type) {
       case 'archive:create-dom': {
-        if (!sender.url?.startsWith(chrome.runtime.getURL(''))) throw new Error('Archive creation must come from the extension.');
-        if (!request.snapshot || !Number.isInteger(request.sourceTabId)) throw new Error('The archive request is incomplete.');
+        if (!sender.url?.startsWith(chrome.runtime.getURL(''))) throw new Error(t('errorExtensionOnly'));
+        if (!request.snapshot || !Number.isInteger(request.sourceTabId)) throw new Error(t('errorArchiveRequestIncomplete'));
         const sourceTabId = request.sourceTabId!;
         const source = await chrome.tabs.get(sourceTabId);
         if (!source.url || source.url !== request.sourceUrl || !isChatGptUrl(source.url)) {
-          throw new Error('The source ChatGPT tab changed while the archive was being created.');
+          throw new Error(t('errorSourceTabChanged'));
         }
         const manifest = await saveSnapshot(request.snapshot, sourceTabId, 'dom-snapshot');
         return { ok: true, manifest };
       }
       case 'archive:create-hard': {
         if (sender.tab?.id === undefined || !sender.url || !isChatGptUrl(sender.url) || !request.snapshot) {
-          throw new Error('The hard-memory archive request is invalid.');
+          throw new Error(t('errorHardMemoryRequestInvalid'));
         }
         const manifest = await saveSnapshot(request.snapshot, sender.tab.id, 'hard-memory');
         return { ok: true, manifest };
@@ -174,24 +175,24 @@ chrome.runtime.onMessage.addListener((request: BackgroundRequest, sender, sendRe
         return { ok: true, archives: await listArchives() };
       case 'archive:delete': {
         if (!sender.url?.startsWith(chrome.runtime.getURL('')) || !isArchiveId(request.archiveId)) {
-          throw new Error('Archive deletion must come from the extension.');
+          throw new Error(t('errorExtensionOnly'));
         }
         await deleteArchive(request.archiveId);
         return { ok: true };
       }
       case 'archive:open':
         if (!sender.url?.startsWith(chrome.runtime.getURL('')) || !request.archiveId) {
-          throw new Error('Reader access must come from the extension.');
+          throw new Error(t('errorExtensionOnly'));
         }
         return { ok: true, tabId: await openReader(request.archiveId) };
       case 'archive:open-and-discard': {
         if (!sender.url?.startsWith(chrome.runtime.getURL('')) || !request.archiveId
           || !Number.isInteger(request.sourceTabId) || !request.sourceUrl || !isChatGptUrl(request.sourceUrl)) {
-          throw new Error('The Reader handoff request is invalid.');
+          throw new Error(t('errorReaderRequestInvalid'));
         }
         const manifest = await readArchiveManifest(request.archiveId);
         if (!manifest || manifest.sourceTabId !== request.sourceTabId || manifest.sourceUrl !== request.sourceUrl) {
-          throw new Error('The archive does not match the selected ChatGPT tab.');
+          throw new Error(t('errorArchiveTabMismatch'));
         }
         await openReader(request.archiveId);
         let discarded = false;
@@ -210,10 +211,10 @@ chrome.runtime.onMessage.addListener((request: BackgroundRequest, sender, sendRe
       }
       case 'archive:resume': {
         if (!sender.url?.startsWith(chrome.runtime.getURL('')) || !request.archiveId) {
-          throw new Error('Resume must come from the Lite Reader.');
+          throw new Error(t('errorReaderOnly'));
         }
         const manifest = await readArchiveManifest(request.archiveId);
-        if (!manifest || !isChatGptUrl(manifest.sourceUrl)) throw new Error('The source conversation could not be found.');
+        if (!manifest || !isChatGptUrl(manifest.sourceUrl)) throw new Error(t('errorSourceConversationNotFound'));
         const source = await findSourceTab(manifest.sourceTabId, manifest.sourceUrl);
         if (source?.id !== undefined) {
           if (manifest.sourceTabId !== source.id) await updateArchiveSourceTabId(manifest.id, source.id);
@@ -225,10 +226,10 @@ chrome.runtime.onMessage.addListener((request: BackgroundRequest, sender, sendRe
       }
       case 'archive:delete-and-resume': {
         if (!sender.url?.startsWith(chrome.runtime.getURL('')) || !isArchiveId(request.archiveId)) {
-          throw new Error('Archive deletion must come from the Lite Reader.');
+          throw new Error(t('errorReaderOnly'));
         }
         const manifest = await readArchiveManifest(request.archiveId);
-        if (!manifest) throw new Error('This archive is no longer available.');
+        if (!manifest) throw new Error(t('errorArchiveUnavailable'));
         await deleteArchive(manifest.id);
         const source = await findSourceTab(manifest.sourceTabId, manifest.sourceUrl);
         if (source?.id !== undefined) {
@@ -240,21 +241,21 @@ chrome.runtime.onMessage.addListener((request: BackgroundRequest, sender, sendRe
       }
       case 'network:record':
         if (sender.tab?.id === undefined || !sender.url || !isChatGptUrl(sender.url)) {
-          throw new Error('Network discovery must come from a ChatGPT content script.');
+          throw new Error(t('errorChatGPTContentOnly'));
         }
         if (request.record) await recordNetworkMetadata(request.record);
         return { ok: true };
       case 'hard-memory:sync':
-        if (!sender.url?.startsWith(chrome.runtime.getURL(''))) throw new Error('Configuration must come from the extension.');
+        if (!sender.url?.startsWith(chrome.runtime.getURL(''))) throw new Error(t('errorExtensionConfigurationOnly'));
         await syncMainWorldScript();
         return { ok: true };
       default:
-        return { ok: false, error: 'Unsupported background request.' };
+        return { ok: false, error: t('errorUnsupportedBackgroundRequest') };
     }
   };
 
   void run().then(sendResponse).catch((error: unknown) => {
-    const message = error instanceof Error ? error.message : 'The requested operation failed.';
+    const message = error instanceof Error ? error.message : t('errorOperationFailed');
     logger.warn('background operation did not complete', message);
     sendResponse({ ok: false, error: message });
   });
