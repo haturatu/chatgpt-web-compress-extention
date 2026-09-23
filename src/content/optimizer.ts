@@ -11,6 +11,7 @@ import type { OptimizerConfig, OptimizerStats, ViewportState, WindowState } from
 
 const STREAMING_GRACE_MS = 3000;
 const FALLBACK_FROZEN_HEIGHT = 420;
+const MEDIA_ATTRIBUTES = ['src', 'srcset', 'poster'] as const;
 
 type OptimizerState = 'active' | 'dormant' | 'cold';
 interface IndexRange { start: number; end: number }
@@ -78,6 +79,10 @@ export class Optimizer {
   private dormantCount = 0;
   private appliedMode: OptimizerConfig['mode'] | null = null;
   private readonly measuredHeights = new WeakMap<HTMLElement, number>();
+  private readonly savedMediaAttributes = new WeakMap<HTMLElement, Array<{
+    element: HTMLElement;
+    attributes: Array<[string, string | null]>;
+  }>>();
 
   constructor(
     private readonly registry: TurnRegistry,
@@ -196,10 +201,10 @@ export class Optimizer {
     ]);
 
     const structureChanged = this.appliedMode !== this.config.mode
-      || this.appliedStructureRevision !== this.registry.structureRevision
+      || this.registry.hasNonAppendChangesSince(this.appliedStructureRevision)
       || total < this.initializedCount;
     if (structureChanged) {
-      if (this.config.mode === 'memory-saver' && this.initializedCount === 0) {
+      if (this.config.mode === 'hibernate' && this.initializedCount === 0) {
         // Read all baseline sizes before writing cold-state styles to avoid read/write layout thrashing.
         for (const element of turns) {
           if (!this.measuredHeights.has(element)) this.recordHeight(element, element.getBoundingClientRect().height);
@@ -252,7 +257,7 @@ export class Optimizer {
 
   private calculateWindow(total: number): WindowState {
     const maxIndex = total - 1;
-    const windowSize = this.config.mode === 'aggressive' || this.config.mode === 'memory-saver'
+    const windowSize = this.config.mode === 'aggressive' || this.config.mode === 'hibernate'
       ? this.config.activeWindow
       : this.config.activeWindow + 20;
     if (total <= windowSize + this.config.pinnedTail) {
@@ -274,7 +279,7 @@ export class Optimizer {
 
   private stateFor(active: boolean): OptimizerState {
     if (active) return 'active';
-    return this.config.mode === 'memory-saver' ? 'cold' : 'dormant';
+    return this.config.mode === 'hibernate' ? 'cold' : 'dormant';
   }
 
   private isInRanges(index: number, ranges: readonly IndexRange[]): boolean {
@@ -305,9 +310,11 @@ export class Optimizer {
         const height = Number.isFinite(measured) && measured > 0 ? measured : FALLBACK_FROZEN_HEIGHT;
         element.style.setProperty('--cgpt-frozen-height', `${Math.ceil(height)}px`);
       }
+      this.hibernateMedia(element);
     } else if (element.style.getPropertyValue('--cgpt-frozen-height')) {
       element.style.removeProperty('--cgpt-frozen-height');
     }
+    if (state !== 'cold') this.restoreMedia(element);
   }
 
   private clearManagedAttributes(): void {
@@ -326,9 +333,48 @@ export class Optimizer {
 
   private clearTurnAttributes(turns: readonly HTMLElement[]): void {
     for (const element of turns) {
+      this.restoreMedia(element);
       element.removeAttribute(OPTIMIZER_TURN_ATTRIBUTE);
       element.removeAttribute(OPTIMIZER_STATE_ATTRIBUTE);
       element.style.removeProperty('--cgpt-frozen-height');
     }
+  }
+
+  private hibernateMedia(turn: HTMLElement): void {
+    if (this.savedMediaAttributes.has(turn)) return;
+    const saved: Array<{ element: HTMLElement; attributes: Array<[string, string | null]> }> = [];
+    for (const element of turn.querySelectorAll<HTMLElement>('img, video, audio, source')) {
+      const attributes = MEDIA_ATTRIBUTES.map((name) => [name, element.getAttribute(name)] as [string, string | null]);
+      const sources = attributes.flatMap(([, value]) => value
+        ? value.split(',').map((entry) => entry.trim().split(/\s+/, 1)[0]!)
+        : []);
+      if (sources.length === 0 || sources.some((source) => {
+        try {
+          const protocol = new URL(source, document.baseURI).protocol;
+          return protocol !== 'http:' && protocol !== 'https:';
+        } catch {
+          return true;
+        }
+      })) continue;
+
+      attributes.push(['loading', element.getAttribute('loading')]);
+      saved.push({ element, attributes });
+      for (const attribute of MEDIA_ATTRIBUTES) element.removeAttribute(attribute);
+      if (element instanceof HTMLImageElement) element.loading = 'lazy';
+    }
+    if (saved.length > 0) this.savedMediaAttributes.set(turn, saved);
+  }
+
+  private restoreMedia(turn: HTMLElement): void {
+    const saved = this.savedMediaAttributes.get(turn);
+    if (!saved) return;
+    for (const entry of saved) {
+      if (!entry.element.isConnected) continue;
+      for (const [name, value] of entry.attributes) {
+        if (value === null) entry.element.removeAttribute(name);
+        else entry.element.setAttribute(name, value);
+      }
+    }
+    this.savedMediaAttributes.delete(turn);
   }
 }

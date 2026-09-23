@@ -2,6 +2,27 @@ import { describe, expect, it } from 'vitest';
 import { TurnRegistry } from '../src/content/registry';
 
 describe('TurnRegistry', () => {
+  it('recognizes appends without marking the whole structure as reordered', () => {
+    const root = document.createElement('main');
+    const first = document.createElement('article');
+    root.append(first);
+    document.body.append(root);
+    const registry = new TurnRegistry();
+    registry.add(first);
+    const revision = registry.structureRevision;
+    const appended = document.createElement('article');
+    root.append(appended);
+    registry.add(appended);
+
+    expect(registry.structureRevision).toBeGreaterThan(revision);
+    expect(registry.hasNonAppendChangesSince(revision)).toBe(false);
+
+    const inserted = document.createElement('article');
+    root.insertBefore(inserted, first);
+    registry.add(inserted);
+    expect(registry.hasNonAppendChangesSince(revision)).toBe(true);
+  });
+
   it('keeps DOM order and removes disconnected turns', () => {
     const root = document.createElement('main');
     const first = document.createElement('article');

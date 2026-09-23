@@ -1,5 +1,7 @@
 import { MAIN_SELECTORS, STRONG_TURN_SELECTORS, TURN_SELECTORS } from './selectors';
 
+const DISCOVERY_MARKUP_SELECTOR = 'main, [role="main"], article, [data-testid^="conversation-turn"], [data-message-author-role]';
+
 const asElements = (nodes: NodeListOf<HTMLElement> | HTMLElement[]): HTMLElement[] =>
   Array.from(nodes);
 
@@ -40,6 +42,27 @@ function collectHeuristicCandidates(root: ParentNode): HTMLElement[] {
     return message.closest<HTMLElement>('article') ?? message.parentElement;
   }).filter((element): element is HTMLElement => element !== null);
   return unique(candidates.filter(isConversationTurn));
+}
+
+export function hasDiscoverableConversationMutation(records: readonly MutationRecord[]): boolean {
+  return records.some((record) => {
+    if (record.type === 'attributes') {
+      const target = record.target;
+      if (!(target instanceof HTMLElement)) return false;
+      if (target.matches(DISCOVERY_MARKUP_SELECTOR)) return true;
+      return Boolean(target.closest('main, [role="main"]')
+        && target.matches('[data-testid], [data-message-author-role]'));
+    }
+
+    return Array.from(record.addedNodes).some((node) => {
+      if (!(node instanceof HTMLElement)) return false;
+      const hasMain = node.matches('main, [role="main"]') || Boolean(node.querySelector('main, [role="main"]'));
+      if (hasMain) return true;
+      const hasTurn = node.matches(DISCOVERY_MARKUP_SELECTOR)
+        || Boolean(node.querySelector('article, [data-testid^="conversation-turn"], [data-message-author-role]'));
+      return hasTurn && Boolean(node.closest('main, [role="main"]'));
+    });
+  });
 }
 
 export function detectTurns(root: ParentNode): HTMLElement[] {

@@ -8,18 +8,35 @@ export const DEFAULT_CONFIG: OptimizerConfig = {
   pinnedTail: 20,
   preloadMargin: 800,
   autoLoad: true,
-  showStats: false
+  showStats: false,
+  networkDiscoveryEnabled: false,
+  hardMemoryEnabled: false,
+  hardMemoryRetainedTurns: 80,
+  hardMemoryPayloadPath: ''
 };
 
 export const CONFIG_LIMITS = {
   activeWindow: { min: 20, max: 240 },
   batchSize: { min: 5, max: 100 },
   pinnedTail: { min: 5, max: 50 },
-  preloadMargin: { min: 200, max: 2000 }
+  preloadMargin: { min: 200, max: 2000 },
+  hardMemoryRetainedTurns: { min: 20, max: 240 }
 } as const;
 
 const isMode = (value: unknown): value is OptimizationMode =>
-  value === 'safe' || value === 'balanced' || value === 'aggressive' || value === 'memory-saver';
+  value === 'safe' || value === 'balanced' || value === 'aggressive' || value === 'hibernate';
+
+function normalizeMode(value: unknown): OptimizationMode {
+  // Older builds exposed the same behavior as “Memory Saver”.
+  const migrated = value === 'memory-saver' ? 'hibernate' : value;
+  return isMode(migrated) ? migrated : DEFAULT_CONFIG.mode;
+}
+
+function normalizePayloadPath(value: unknown): string {
+  if (typeof value !== 'string' || value.length > 256 || !value.startsWith('/')) return '';
+  if (value.includes('?') || value.includes('#')) return '';
+  return value;
+}
 
 const numberInRange = (value: unknown, min: number, max: number, fallback: number): number => {
   if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
@@ -30,7 +47,7 @@ export function normalizeConfig(value: Partial<OptimizerConfig> | null | undefin
   const source = value ?? {};
   return {
     enabled: typeof source.enabled === 'boolean' ? source.enabled : DEFAULT_CONFIG.enabled,
-    mode: isMode(source.mode) ? source.mode : DEFAULT_CONFIG.mode,
+    mode: normalizeMode(source.mode),
     activeWindow: numberInRange(
       source.activeWindow,
       CONFIG_LIMITS.activeWindow.min,
@@ -56,7 +73,20 @@ export function normalizeConfig(value: Partial<OptimizerConfig> | null | undefin
       DEFAULT_CONFIG.preloadMargin
     ),
     autoLoad: typeof source.autoLoad === 'boolean' ? source.autoLoad : DEFAULT_CONFIG.autoLoad,
-    showStats: typeof source.showStats === 'boolean' ? source.showStats : DEFAULT_CONFIG.showStats
+    showStats: typeof source.showStats === 'boolean' ? source.showStats : DEFAULT_CONFIG.showStats,
+    networkDiscoveryEnabled: typeof source.networkDiscoveryEnabled === 'boolean'
+      ? source.networkDiscoveryEnabled
+      : DEFAULT_CONFIG.networkDiscoveryEnabled,
+    hardMemoryEnabled: typeof source.hardMemoryEnabled === 'boolean'
+      ? source.hardMemoryEnabled
+      : DEFAULT_CONFIG.hardMemoryEnabled,
+    hardMemoryRetainedTurns: numberInRange(
+      source.hardMemoryRetainedTurns,
+      CONFIG_LIMITS.hardMemoryRetainedTurns.min,
+      CONFIG_LIMITS.hardMemoryRetainedTurns.max,
+      DEFAULT_CONFIG.hardMemoryRetainedTurns
+    ),
+    hardMemoryPayloadPath: normalizePayloadPath(source.hardMemoryPayloadPath)
   };
 }
 
