@@ -14,9 +14,6 @@ export interface OptimizerConfig {
 export interface TurnInfo {
   element: HTMLElement;
   index: number;
-  height: number;
-  visible: boolean;
-  lastSeen: number;
 }
 
 export interface ViewportState {
@@ -42,7 +39,6 @@ export interface OptimizerStats {
   firstVisible: number;
   lastVisible: number;
   longTasks: number;
-  domElements: number;
   rootDetected: boolean;
   disabledReason?: string;
 }

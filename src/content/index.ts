@@ -115,17 +115,14 @@ class ContentController {
     if (!registryChanged) return;
     this.scheduler.idle(() => {
       this.registry.cleanupDisconnected();
-      this.metrics.refreshDomCount();
     });
     this.scheduler.frame(() => this.reconcile());
   }
 
   private handleViewport(firstVisible: number, lastVisible: number): void {
-    this.scheduler.frame(() => {
-      this.optimizer?.updateViewport(firstVisible, lastVisible);
-      this.refreshObserverWindow();
-      this.updateStatus();
-    });
+    this.optimizer?.updateViewport(firstVisible, lastVisible);
+    this.refreshObserverWindow();
+    this.updateStatus();
   }
 
   private handleExpandBefore(): void {
@@ -176,14 +173,12 @@ class ContentController {
       firstVisible: viewport.firstVisible,
       lastVisible: viewport.lastVisible,
       longTasks: this.metrics.longTasks,
-      domElements: this.metrics.domCount,
       rootDetected: Boolean(this.currentRoot),
       ...(this.disabledReason ? { disabledReason: this.disabledReason } : {})
     };
   }
 
   private updateStatus(): void {
-    this.metrics.refreshDomCount();
     const stats = this.getStats();
     this.status.update(stats, stats.enabled, this.config.showStats);
   }
