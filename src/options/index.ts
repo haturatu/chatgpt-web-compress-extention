@@ -1,6 +1,8 @@
 import { loadConfig, saveConfig } from '../shared/config';
-import { t } from '../shared/i18n';
+import { localizeDocument, t } from '../shared/i18n';
 import type { NetworkDiscoveryRecord, OptimizerConfig } from '../shared/types';
+
+localizeDocument();
 
 const $ = <T extends HTMLElement>(id: string): T => {
   const element = document.getElementById(id);

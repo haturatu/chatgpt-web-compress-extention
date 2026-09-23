@@ -1,6 +1,8 @@
 import { readArchiveChunk, readArchiveManifest } from '../shared/archive';
-import { t, uiLocale } from '../shared/i18n';
+import { localizeDocument, t, uiLocale } from '../shared/i18n';
 import type { ArchiveManifest, ArchivedMedia, ArchivedTurn } from '../shared/types';
+
+localizeDocument();
 
 const WINDOW_SIZE = 40;
 const BUFFER_BEFORE = 6;
