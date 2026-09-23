@@ -27,6 +27,20 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: #ededed; flex:
 input[type="range"] { margin: 11px 0 0; accent-color: #ededed; cursor: pointer; }
 output { color: #c5c5c5; font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
 .stats-card { margin-top: 20px; border: 1px solid #2b2b2b; border-radius: 10px; padding: 13px; background: #171717; }
+.archive-card { margin-top: 14px; border: 1px solid #2b2b2b; border-radius: 10px; padding: 13px; background: #171717; }
+.archive-card > .hint { margin: 0 0 12px; }
+.primary-button { width: 100%; border: 1px solid #ededed; border-radius: 7px; padding: 9px 12px; background: #ededed; color: #111; font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; }
+.primary-button:hover { background: #fff; }
+.archives { display: grid; gap: 7px; margin-top: 10px; }
+.archive-entry { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; border-top: 1px solid #2b2b2b; padding-top: 8px; }
+.archive-entry span { min-width: 0; overflow: hidden; color: #bdbdbd; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.archive-entry button { flex: 0 0 auto; border: 1px solid #454545; border-radius: 6px; padding: 5px 7px; background: transparent; color: #eee; font: inherit; font-size: 10px; cursor: pointer; }
+.confirm-dialog { width: min(420px, calc(100% - 32px)); border: 1px solid #444; border-radius: 12px; padding: 18px; background: #171717; color: #ededed; box-shadow: 0 18px 64px #0009; }
+.confirm-dialog::backdrop { background: #0009; }
+.confirm-dialog h2 { margin: 0; font-size: 15px; }
+.confirm-dialog p { color: #a7a7a7; font-size: 12px; line-height: 1.5; }
+.dialog-actions { display: flex; gap: 8px; }
+.dialog-actions > button { flex: 1; }
 .section-heading { margin-bottom: 14px; }
 .section-heading span { color: #898989; font-size: 10px; }
 .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 0; }

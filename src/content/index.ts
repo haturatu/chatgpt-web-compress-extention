@@ -1,7 +1,13 @@
 import { loadConfig, normalizeConfig } from '../shared/config';
 import { logger } from '../shared/logger';
-import type { ContentRequest, ContentResponse, OptimizerConfig, OptimizerStats } from '../shared/types';
-import { detectTurnsYielding, extractTurnsFromNode, findConversationRoot } from './detector';
+import type { ArchiveSnapshot, ArchivedMedia, ArchivedTurn, ContentRequest, ContentResponse, OptimizerConfig, OptimizerStats } from '../shared/types';
+import {
+  detectTurns,
+  detectTurnsYielding,
+  extractTurnsFromNode,
+  findConversationRoot,
+  hasDiscoverableConversationMutation
+} from './detector';
 import { ConversationObservers } from './observers';
 import { Optimizer } from './optimizer';
 import { TurnRegistry } from './registry';
@@ -78,21 +84,23 @@ class ContentController {
     this.discoverAndMount();
     if (this.currentRoot) return;
 
-    if (!document.body) return;
+    this.observeDiscoveryMutations();
+  }
+
+  private observeDiscoveryMutations(): void {
+    const discoveryRoot = document.documentElement;
+    if (this.discoveryObserver || !discoveryRoot) return;
     this.discoveryObserver = new MutationObserver((records) => {
-      const relevant = records.some((record) => Array.from(record.addedNodes).some((node) => {
-        if (!(node instanceof HTMLElement)) return false;
-        const hasMain = node.matches('main, [role="main"]') || Boolean(node.querySelector('main, [role="main"]'));
-        const hasTurn = node.matches(
-          'article, [data-testid^="conversation-turn"], [data-message-author-role]'
-        ) || Boolean(node.querySelector(
-          'article, [data-testid^="conversation-turn"], [data-message-author-role]'
-        ));
-        return hasMain || (hasTurn && Boolean(node.closest('main, [role="main"]')));
-      }));
-      if (relevant) this.scheduler.frame(() => this.discoverAndMount());
+      if (hasDiscoverableConversationMutation(records)) {
+        this.scheduler.frame(() => this.discoverAndMount());
+      }
     });
-    this.discoveryObserver.observe(document.body, { childList: true, subtree: true });
+    this.discoveryObserver.observe(discoveryRoot, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['role', 'data-testid', 'data-message-author-role']
+    });
   }
 
   private discoverAndMount(): void {
@@ -105,6 +113,7 @@ class ContentController {
     const root = findConversationRoot(document);
     if (!root) {
       this.disabledReason = 'unsupported-dom';
+      this.observeDiscoveryMutations();
       return;
     }
 
@@ -268,6 +277,75 @@ class ContentController {
     this.status.update(stats, stats.enabled, this.config.showStats);
   }
 
+  private createArchiveSnapshot(): ArchiveSnapshot {
+    const url = new URL(location.href);
+    const conversationId = url.pathname.match(/\/c\/([^/]+)/)?.[1];
+    if (!conversationId || !this.currentRoot?.isConnected) {
+      throw new Error('Open a loaded ChatGPT conversation before archiving it.');
+    }
+    if (document.querySelector('[data-testid="stop-button"], button[aria-label*="Stop" i], [data-is-streaming="true"]')) {
+      throw new Error('Wait for the current response to finish before archiving.');
+    }
+    const composer = document.querySelector<HTMLElement>(
+      '#prompt-textarea, [data-testid="prompt-textarea"], [contenteditable="true"]'
+    );
+    const draft = composer instanceof HTMLTextAreaElement || composer instanceof HTMLInputElement
+      ? composer.value
+      : composer?.textContent;
+    if (draft?.trim() || composer?.querySelector(
+      '[data-testid*="attachment"], [data-testid*="upload"], button[aria-label*="remove attachment" i]'
+    )) throw new Error('Send or clear the draft and attachments before archiving this conversation.');
+
+    const elements = detectTurns(this.currentRoot);
+    if (elements.length === 0) throw new Error('No conversation turns were found on this page.');
+    const turns = elements.map((element, index): ArchivedTurn => {
+      const message = element.matches('[data-message-author-role]')
+        ? element
+        : element.querySelector<HTMLElement>('[data-message-author-role]') ?? element;
+      const role = message.getAttribute('data-message-author-role') ?? 'unknown';
+      const text = (message.innerText || message.textContent || '').trim();
+      const media: ArchivedMedia[] = [];
+      for (const image of message.querySelectorAll<HTMLImageElement>('img[src]')) {
+        const source = image.currentSrc || image.src;
+        if (!source.startsWith('http:') && !source.startsWith('https:')) continue;
+        media.push({
+          kind: 'image',
+          source,
+          alt: image.alt,
+          ...(image.naturalWidth > 0 ? { width: image.naturalWidth } : {}),
+          ...(image.naturalHeight > 0 ? { height: image.naturalHeight } : {})
+        });
+      }
+      for (const video of message.querySelectorAll<HTMLVideoElement>('video[src], video source[src]')) {
+        const source = video instanceof HTMLSourceElement ? video.src : video.currentSrc || video.src;
+        if (source.startsWith('http:') || source.startsWith('https:')) {
+          media.push({ kind: 'video', source, alt: 'Video attachment' });
+        }
+      }
+      for (const audio of message.querySelectorAll<HTMLAudioElement>('audio[src], audio source[src]')) {
+        const source = audio instanceof HTMLSourceElement ? audio.src : audio.currentSrc || audio.src;
+        if (source.startsWith('http:') || source.startsWith('https:')) {
+          media.push({ kind: 'audio', source, alt: 'Audio attachment' });
+        }
+      }
+      const rect = element.getBoundingClientRect();
+      return {
+        index,
+        role,
+        text,
+        height: Number.isFinite(rect.height) && rect.height > 0 ? Math.ceil(rect.height) : 420,
+        media
+      };
+    });
+
+    return {
+      sourceUrl: url.href,
+      title: document.title || 'ChatGPT conversation',
+      conversationId,
+      turns
+    };
+  }
+
   private handleMessage = (
     request: ContentRequest,
     _sender: chrome.runtime.MessageSender,
@@ -275,6 +353,14 @@ class ContentController {
   ): boolean => {
     if (request?.type === 'get-state' || request?.type === 'get-stats') {
       sendResponse({ ok: true, stats: this.getStats() });
+      return false;
+    }
+    if (request?.type === 'create-archive-snapshot') {
+      try {
+        sendResponse({ ok: true, snapshot: this.createArchiveSnapshot() });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : 'Unable to create an archive.' });
+      }
       return false;
     }
     if (request?.type === 'disable-for-tab') {

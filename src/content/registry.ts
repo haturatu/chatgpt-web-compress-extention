@@ -3,6 +3,7 @@ export class TurnRegistry {
   private membership = new WeakSet<HTMLElement>();
   private indices = new WeakMap<HTMLElement, number>();
   private currentStructureRevision = 0;
+  private latestNonAppendRevision = 0;
 
   add(element: HTMLElement): boolean {
     if (this.membership.has(element)) return false;
@@ -13,6 +14,7 @@ export class TurnRegistry {
       this.turns.push(element);
       this.membership.add(element);
       this.indices.set(element, index);
+      this.currentStructureRevision += 1;
       return true;
     }
 
@@ -29,6 +31,7 @@ export class TurnRegistry {
     this.membership.add(element);
     this.reindexFrom(low);
     this.currentStructureRevision += 1;
+    this.latestNonAppendRevision = this.currentStructureRevision;
     return true;
   }
 
@@ -64,6 +67,7 @@ export class TurnRegistry {
     this.indices.delete(element);
     this.reindexFrom(index);
     this.currentStructureRevision += 1;
+    this.latestNonAppendRevision = this.currentStructureRevision;
     return true;
   }
 
@@ -85,6 +89,7 @@ export class TurnRegistry {
     if (removed > 0) {
       this.turns.length = writeIndex;
       this.currentStructureRevision += 1;
+      this.latestNonAppendRevision = this.currentStructureRevision;
     }
     return removed;
   }
@@ -107,6 +112,7 @@ export class TurnRegistry {
     if (removed > 0) {
       this.turns.length = writeIndex;
       this.currentStructureRevision += 1;
+      this.latestNonAppendRevision = this.currentStructureRevision;
     }
   }
 
@@ -118,6 +124,7 @@ export class TurnRegistry {
     }
     this.turns.length = 0;
     this.currentStructureRevision += 1;
+    this.latestNonAppendRevision = this.currentStructureRevision;
   }
 
   elements(): readonly HTMLElement[] {
@@ -138,6 +145,10 @@ export class TurnRegistry {
 
   get structureRevision(): number {
     return this.currentStructureRevision;
+  }
+
+  hasNonAppendChangesSince(revision: number): boolean {
+    return this.latestNonAppendRevision > revision;
   }
 
   count(): number {

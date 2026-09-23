@@ -9,4 +9,11 @@ describe('config', () => {
       batchSize: 5
     });
   });
+
+  it('migrates the former Memory Saver mode to Hibernate and leaves hard memory off by default', () => {
+    const config = normalizeConfig({ mode: 'memory-saver' as never });
+    expect(config.mode).toBe('hibernate');
+    expect(config.hardMemoryEnabled).toBe(false);
+    expect(config.networkDiscoveryEnabled).toBe(false);
+  });
 });

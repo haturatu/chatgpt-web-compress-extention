@@ -1,0 +1,49 @@
+:root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #101010; color: #ededed; }
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; background: #101010; }
+.skip-link { position: fixed; z-index: 10; top: 8px; left: 8px; transform: translateY(-150%); border-radius: 6px; padding: 10px 14px; background: #fff; color: #111; }
+.skip-link:focus { transform: translateY(0); }
+.reader-header { position: sticky; z-index: 2; top: 0; display: flex; align-items: center; justify-content: space-between; gap: 18px; border-bottom: 1px solid #2b2b2b; padding: 16px max(20px, calc((100vw - 1040px) / 2)); background: #101010ed; backdrop-filter: blur(12px); }
+.title-group { min-width: 0; }
+.eyebrow { margin: 0 0 4px; color: #969696; font-size: 10px; font-weight: 700; letter-spacing: .14em; }
+h1 { overflow: hidden; margin: 0; font-size: clamp(16px, 2vw, 21px); letter-spacing: -.025em; text-overflow: ellipsis; white-space: nowrap; }
+.muted { margin: 5px 0 0; color: #929292; font-size: 11px; }
+.actions, .dialog-actions { display: flex; align-items: center; gap: 8px; }
+.actions { flex: 0 0 auto; }
+main { width: min(900px, calc(100% - 32px)); margin: 0 auto; padding: 18px 0 40px; }
+.search-row { display: flex; align-items: center; gap: 10px; }
+.search-row label { flex: 0 0 auto; color: #d1d1d1; font-size: 12px; }
+input[type="search"] { min-width: 0; flex: 1; border: 1px solid #3a3a3a; border-radius: 8px; padding: 10px 12px; background: #191919; color: #f1f1f1; font: inherit; font-size: 13px; }
+.secondary-button, .danger-button { min-height: 36px; border: 1px solid #454545; border-radius: 7px; padding: 8px 11px; background: #181818; color: #eee; font: inherit; font-size: 12px; cursor: pointer; touch-action: manipulation; }
+.secondary-button:hover { background: #252525; }
+.danger-button { border-color: #7b3636; color: #ffc6c6; }
+.danger-button:hover { background: #321d1d; }
+.status { min-height: 18px; margin: 12px 0 8px; color: #aaa; font-size: 12px; }
+.conversation-scroll { height: calc(100vh - 154px); min-height: 360px; overflow: auto; overscroll-behavior: contain; border: 1px solid #292929; border-radius: 12px; background: #151515; scroll-padding-block: 20px; }
+.turn-card { margin: 0; border-bottom: 1px solid #2a2a2a; padding: 18px clamp(14px, 3vw, 24px); }
+.turn-heading { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 10px; color: #9f9f9f; font-size: 11px; }
+.turn-role { color: #ededed; font-weight: 650; text-transform: capitalize; }
+.turn-text { margin: 0; color: #e2e2e2; font: 13px/1.65 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+.media-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.media-placeholder { display: grid; gap: 6px; max-width: 360px; border: 1px solid #373737; border-radius: 8px; padding: 10px; background: #1b1b1b; }
+.media-placeholder img { display: block; max-width: 100%; max-height: 280px; object-fit: contain; }
+.media-placeholder a { color: #c9d9ff; font-size: 11px; }
+.media-placeholder button { border: 0; padding: 0; background: transparent; color: #ddd; font: inherit; font-size: 12px; text-align: left; text-decoration: underline; cursor: pointer; }
+dialog { width: min(420px, calc(100% - 32px)); border: 1px solid #444; border-radius: 12px; padding: 18px; background: #171717; color: #ededed; box-shadow: 0 18px 64px #0009; }
+dialog::backdrop { background: #0009; }
+dialog h2 { margin: 0; font-size: 15px; }
+dialog p { color: #aaa; font-size: 12px; line-height: 1.5; }
+.dialog-actions { justify-content: flex-end; }
+:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+@media (max-width: 640px) {
+  .reader-header { align-items: flex-start; flex-direction: column; padding: 14px 16px; }
+  .actions { width: 100%; }
+  .actions button { flex: 1; }
+  main { width: calc(100% - 20px); padding-top: 12px; }
+  .search-row { display: grid; grid-template-columns: 1fr auto; }
+  .search-row label { grid-column: 1 / -1; }
+  .search-row input { grid-column: 1; }
+  .search-row button { grid-column: 2; }
+  .conversation-scroll { height: calc(100vh - 206px); min-height: 280px; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition: none !important; } }
