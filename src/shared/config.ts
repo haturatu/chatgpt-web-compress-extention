@@ -92,7 +92,7 @@ export function normalizeConfig(value: Partial<OptimizerConfig> | null | undefin
 
 export async function loadConfig(): Promise<OptimizerConfig> {
   try {
-    const stored = await chrome.storage.local.get(DEFAULT_CONFIG);
+    const stored = await chrome.storage.local.get({ ...DEFAULT_CONFIG });
     return normalizeConfig(stored as Partial<OptimizerConfig>);
   } catch {
     return DEFAULT_CONFIG;
